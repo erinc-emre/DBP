@@ -59,8 +59,18 @@ class Config:
 # --------------------------------------------------------------------------- #
 # Geo helpers
 # --------------------------------------------------------------------------- #
-def earth_radius(cfg):
-    return max(bpy.data.objects[cfg.earth_object].dimensions) / 2.0
+def earth_base_radius(earth_obj):
+    """Representative (sea-level) radius of the displaced Earth = min vertex radius.
+
+    Using the minimum (oceans sit at the base sphere) gives a stable reference for
+    altitude scaling, independent of the tallest terrain bump.
+    """
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = earth_obj.evaluated_get(dg).to_mesh()
+    c = earth_obj.matrix_world.translation
+    rmin = min((earth_obj.matrix_world @ v.co - c).length for v in me.vertices)
+    earth_obj.evaluated_get(dg).to_mesh_clear()
+    return rmin
 
 
 def smooth_points(pts, window, passes):
@@ -86,20 +96,58 @@ def smooth_points(pts, window, passes):
     return cur
 
 
-def make_to_xyz(cfg, R, alt_exag):
+def _unit_dir(lat, lon, off):
+    latr = math.radians(lat)
+    lonr = math.radians(lon + off)
+    return mathutils.Vector(
+        (
+            math.cos(latr) * math.cos(lonr),
+            math.cos(latr) * math.sin(lonr),
+            math.sin(latr),
+        )
+    )
+
+
+def make_surface_sampler(earth_obj, fallback_r):
+    """Return surface_radius(world_dir) that ray-casts the ACTUAL displaced Earth
+    surface in a given direction from the Earth centre.
+
+    The Earth has terrain displacement (geo-node heightmap), so it is not a clean
+    sphere; a constant radius would make the route float above / sink into the
+    surface. We BVH ray-cast the real mesh and return the hit radius (world units).
+    """
+    from mathutils.bvhtree import (
+        BVHTree,
+    )  # local import (robust against import strippers)
+
+    dg = bpy.context.evaluated_depsgraph_get()
+    bvh = BVHTree.FromObject(earth_obj, dg)  # object-local space
+    mw = earth_obj.matrix_world
+    mwi = mw.inverted()
+    center_world = mw.translation.copy()
+
+    def surface_radius(world_dir):
+        local_dir = (mwi.to_3x3() @ world_dir).normalized()
+        loc, _n, _i, _d = bvh.ray_cast(mathutils.Vector((0.0, 0.0, 0.0)), local_dir)
+        if loc is None:
+            return fallback_r
+        return ((mw @ loc) - center_world).length
+
+    return surface_radius
+
+
+def make_to_xyz(cfg, surface_radius, alt_unit_per_m, center):
+    """Place (lat,lon,alt) at  surface_radius(dir) + alt*scale  along the direction.
+
+    Hugs the real terrain at alt=0 (airports sit on the surface) and lifts the
+    aircraft by an exaggerated-but-proportional altitude offset.
+    """
     off = cfg.lon_offset_deg
 
     def to_xyz(lat, lon, alt_m):
-        latr = math.radians(lat)
-        lonr = math.radians(lon + off)
-        rr = R + alt_m * (R / REAL_EARTH_R) * alt_exag
-        return mathutils.Vector(
-            (
-                rr * math.cos(latr) * math.cos(lonr),
-                rr * math.cos(latr) * math.sin(lonr),
-                rr * math.sin(latr),
-            )
-        )
+        d = _unit_dir(lat, lon, off)
+        rr = surface_radius(d) + alt_m * alt_unit_per_m
+        return center + rr * d
 
     return to_xyz
 
@@ -252,10 +300,15 @@ def import_flight(json_path, cfg=Config):
     f0 = cfg.frame_start if cfg.frame_start is not None else scn.frame_start
     f1 = cfg.frame_end if cfg.frame_end is not None else scn.frame_end
 
-    R = earth_radius(cfg)
+    earth = bpy.data.objects[cfg.earth_object]
+    center = earth.matrix_world.translation.copy()
+    R_base = earth_base_radius(earth)
     max_alt = max(w["alt_m"] for w in wps) or 1.0
-    alt_exag = (cfg.alt_target_frac * R) / (max_alt * (R / REAL_EARTH_R))
-    to_xyz = make_to_xyz(cfg, R, alt_exag)
+    # Max cruise altitude is drawn as alt_target_frac of the (base) radius above
+    # the surface; offset is linear in altitude.
+    alt_unit_per_m = (cfg.alt_target_frac * R_base) / max_alt
+    surface_radius = make_surface_sampler(earth, R_base)
+    to_xyz = make_to_xyz(cfg, surface_radius, alt_unit_per_m, center)
 
     pts = [to_xyz(w["lat"], w["lon"], w["alt_m"]) for w in wps]
     trel = [w["t_rel"] for w in wps]
@@ -278,8 +331,8 @@ def import_flight(json_path, cfg=Config):
     scn.frame_set(f0)
     return {
         "waypoints": len(pts),
-        "earth_radius": round(R, 3),
-        "alt_exaggeration": round(alt_exag, 2),
+        "earth_base_radius": round(R_base, 3),
+        "max_alt_offset": round(alt_unit_per_m * max_alt, 3),
         "frames": [f0, f1],
         "callsign": data.get("meta", {}).get("callsign"),
     }
