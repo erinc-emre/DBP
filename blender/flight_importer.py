@@ -49,6 +49,8 @@ class Config:
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
     make_markers = False  # origin/destination sphere markers
+    sync_sun = True  # drive Sun_T3 from the flight's real UTC time (subsolar point)
+    sun_object = "Sun_T3"
     make_chase_cam = True
     chase_back = 2.6  # chase camera distance behind (Blender units)
     chase_up = 1.1  # chase camera height above aircraft
@@ -286,6 +288,66 @@ def build_chase_cam(cfg, pos_at, total, f0, f1):
     return chase
 
 
+def _subsolar_dir(t_unix, off):
+    """Unit vector (in the scene's geo convention) pointing at the subsolar point
+    for a given UTC Unix time: the spot on Earth where the Sun is overhead.
+
+    lon_subsolar = (12 - UTC_hours) * 15  (ignores the equation of time, ~<=15 min)
+    lat_subsolar = solar declination for the date.
+    """
+    import datetime
+
+    dt = datetime.datetime.fromtimestamp(t_unix, tz=datetime.timezone.utc)
+    hours = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
+    doy = dt.timetuple().tm_yday
+    decl = 23.44 * math.sin(math.radians(360.0 / 365.0 * (doy - 81)))  # ~0 at equinox
+    sub_lon = (12.0 - hours) * 15.0
+    return _unit_dir(decl, sub_lon, off)
+
+
+def animate_sun(cfg, wps, f0, f1):
+    """Keyframe the Sun lamp so its direction tracks the real subsolar point over
+    the flight's actual time span (Earth turns 15°/h, so a 2 h flight => ~30°).
+
+    The Sun emits along its local -Z; we aim that toward the Earth centre from the
+    subsolar side so the lit hemisphere matches the real date/time and geography.
+    """
+    sun = bpy.data.objects.get(cfg.sun_object)
+    if sun is None:
+        return None
+    if sun.animation_data:
+        sun.animation_data_clear()
+    sun.rotation_mode = "XYZ"
+    off = cfg.lon_offset_deg
+    t0 = wps[0]["t"]
+    dur = (wps[-1]["t"] - t0) or 1
+    nf = max(f1 - f0, 1)
+    for f in range(f0, f1 + 1):
+        t = t0 + (f - f0) / nf * dur
+        emit = -_subsolar_dir(t, off)  # rays travel from subsolar point toward centre
+        sun.rotation_euler = emit.to_track_quat("-Z", "Y").to_euler()
+        sun.keyframe_insert("rotation_euler", frame=f)
+    if sun.animation_data and sun.animation_data.action:
+        for fc in _action_fcurves(sun.animation_data.action):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+    return sun
+
+
+def _action_fcurves(action):
+    """Yield fcurves from legacy or layered (4.4+/5.x) actions."""
+    if hasattr(action, "fcurves") and len(action.fcurves):
+        yield from action.fcurves
+        return
+    try:
+        for layer in action.layers:
+            for strip in layer.strips:
+                for cb in strip.channelbags:
+                    yield from cb.fcurves
+    except Exception:
+        return
+
+
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
@@ -325,6 +387,8 @@ def import_flight(json_path, cfg=Config):
         _remove("Marker_Origin")
         _remove("Marker_Dest")
     ac, pos_at, total = animate_aircraft(cfg, pts, trel, f0, f1)
+    if cfg.sync_sun:
+        animate_sun(cfg, wps, f0, f1)
     if cfg.make_chase_cam:
         build_chase_cam(cfg, pos_at, total, f0, f1)
 
