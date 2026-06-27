@@ -14,13 +14,13 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | `flight.json` schema contract | ✅ | `preprocess/FLIGHT_SCHEMA.md` (v1, SI units) |
 | Offline sample flight (JFK→FRA) | ✅ | `make_sample_flight.py` → `sample_flight.json` |
 | Schema validator | ✅ | `validate_flight_json.py` |
-| Airports lookup | 🟡 | `airports.py` (42 airports) — small; misses many ICAO codes (e.g. OJAI), so some origin/dest coords resolve to null. Consider full OurAirports dataset. |
+| Airports lookup | 🟡 | `airports.py` (42 airports), now used by the preprocessor too; still misses many ICAO codes (e.g. OJAI) → some coords resolve to null. Consider full OurAirports dataset. |
 | OpenSky REST preprocessor | ✅ | `opensky_to_flightjson.py`; proven against the **live API** (real flight UAE44 EDDF→OJAI, 357 waypoints) |
 | **OpenSky credentials** | ✅ | `credentials.json` present; OAuth2 token fetch verified |
 | **Live REST fetch proven** | ✅ | departures→icao24 + `/tracks` fetch worked; output passed the validator + rendered in Blender. (Fair use: only 2 credit-calls used in testing) |
 | Trino historical access | ❌ | No research-access application submitted; >30-day history impossible until then |
 | `/tracks` 30-day limit handling | 🟡 | Documented + enforced; no automatic fallback strategy for older flights |
-| Real demo flight chosen | 🟡 | A real flight (UAE44) is captured as proof in `preprocess/output/flight_real.json`; the *intended* showcase flight (e.g. a clean transatlantic) not yet finalized |
+| Real demo flight chosen | ✅ | Canonical demo is now a **real** flight: `preprocess/flight.json` (DLH67K, Frankfurt EDDF → Madrid LEMD, 425 waypoints). `make_sample_flight.py`/`sample_flight.json` kept only as offline fallback. |
 | Speed for REST tracks | 🟡 | Derived from waypoints (tracks lack velocity) — approximate, not source-true |
 
 ## 2. Weather (entire branch untouched)

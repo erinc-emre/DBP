@@ -49,6 +49,14 @@ sys.path.insert(
 
 import opensky_api  # noqa: E402  (path injected above)
 
+# Optional richer airport table (preprocess/airports.py, ~40+ airports). The
+# small embedded AIRPORTS dict below is a fallback so this module still works
+# standalone if airports.py is missing.
+try:
+    import airports as _airports_mod  # noqa: E402
+except Exception:  # pragma: no cover
+    _airports_mod = None
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -221,6 +229,11 @@ def airport_record(icao):
     if not icao:
         return None
     icao = icao.strip().upper()
+    # Prefer the richer shared table (airports.py) when available.
+    if _airports_mod is not None:
+        rec = _airports_mod.get_by_icao(icao)
+        if rec:
+            return dict(rec)
     if icao in AIRPORTS:
         return dict(AIRPORTS[icao])
     return {"icao": icao, "iata": None, "name": None, "lat": None, "lon": None}

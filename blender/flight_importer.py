@@ -252,5 +252,9 @@ if __name__ == "__main__":
     import os
 
     here = os.path.dirname(os.path.abspath(__file__))
-    default = os.path.join(here, "..", "preprocess", "sample_flight.json")
+    # Canonical demo = a REAL flight (preprocess/flight.json). The synthetic
+    # sample_flight.json remains as an offline fallback if flight.json is absent.
+    pre = os.path.join(here, "..", "preprocess")
+    real = os.path.join(pre, "flight.json")
+    default = real if os.path.isfile(real) else os.path.join(pre, "sample_flight.json")
     print(import_flight(os.path.normpath(default)))
