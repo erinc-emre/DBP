@@ -40,11 +40,12 @@ REAL_EARTH_R = 6_371_000.0  # meters
 class Config:
     earth_object = "ProcEarth"
     aircraft_root = "B747_8F"  # root empty/object to animate (already in scene)
-    lon_offset_deg = -168.0  # texture longitude calibration
+    lon_offset_deg = (
+        -177.19
+    )  # texture longitude calibration (measured from ProcEarth earth_uv)
     alt_target_frac = 0.06  # max altitude drawn as this fraction of Earth radius
     route_bevel = 0.03  # route tube thickness (Blender units)
     forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
-    lock_roll = True  # keep wings level (yaw+pitch only, never bank/roll)
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
     make_chase_cam = True
@@ -183,36 +184,13 @@ def _path_sampler(pts, trel):
     return pos_at, total
 
 
-def _look_rotation(eye, target, up_ref):
-    """Euler for an object looking from `eye` to `target` (down local -Z, up
-    local +Y) with `up_ref` as the up reference. Roll-free w.r.t. up_ref, so
-    the horizon stays level (no camera banking)."""
-    z = (eye - target).normalized()  # camera local +Z (opposite view)
-    x = up_ref.normalized().cross(z)
-    if x.length < 1e-6:
-        x = mathutils.Vector((1, 0, 0))
-    x.normalize()
-    y = z.cross(x)  # camera local +Y (its up)
-    return mathutils.Matrix(
-        ((x.x, y.x, z.x), (x.y, y.y, z.y), (x.z, y.z, z.z))
-    ).to_euler()
-
-
-def _orient(fwd, radial, forward_sign, lock_roll=True):
-    """Aircraft orientation along the path.
-
-    With lock_roll (default), the local "up" is forced into the plane spanned
-    by the radial (local vertical) and the forward tangent, so the wing axis
-    (local X = forward x up) is always perpendicular to the vertical. That
-    guarantees **zero roll/bank** -- the only rotations are yaw (heading) and
-    pitch (climb/descent). Wings stay level at all times.
-    """
+def _orient(fwd, radial, forward_sign):
     fwd = fwd * forward_sign
     if fwd.length < 1e-6:
         fwd = mathutils.Vector((0, 1, 0))
     fwd.normalize()
-    up = (radial - fwd * radial.dot(fwd)).normalized()  # radial component ⟂ fwd
-    right = fwd.cross(up)  # wing axis: horizontal
+    up = (radial - fwd * radial.dot(fwd)).normalized()
+    right = fwd.cross(up)
     return mathutils.Matrix(
         ((right.x, fwd.x, up.x), (right.y, fwd.y, up.y), (right.z, fwd.z, up.z))
     ).to_euler()
@@ -230,9 +208,7 @@ def animate_aircraft(cfg, pts, trel, f0, f1):
         p = pos_at(tr)
         pn = pos_at(min(tr + total * 0.01, total))
         ac.location = p
-        ac.rotation_euler = _orient(
-            pn - p, p.normalized(), cfg.forward_sign, cfg.lock_roll
-        )
+        ac.rotation_euler = _orient(pn - p, p.normalized(), cfg.forward_sign)
         ac.keyframe_insert("location", frame=f)
         ac.keyframe_insert("rotation_euler", frame=f)
     return ac, pos_at, total
@@ -254,9 +230,8 @@ def build_chase_cam(cfg, pos_at, total, f0, f1):
         fwd = fwd.normalized() if fwd.length > 1e-6 else mathutils.Vector((0, 1, 0))
         up = p.normalized()
         chase.location = p + up * cfg.chase_up - fwd * cfg.chase_back
-        # Use the radial as the camera up reference so the horizon stays level
-        # and the aircraft never appears to roll in the chase view.
-        chase.rotation_euler = _look_rotation(chase.location, p + fwd * 1.0, up)
+        look = (p + fwd * 1.0) - chase.location
+        chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
         chase.keyframe_insert("location", frame=f)
         chase.keyframe_insert("rotation_euler", frame=f)
     return chase
