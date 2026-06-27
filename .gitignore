@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# OpenSky API credentials (contains client secret) — never commit
+credentials.json
