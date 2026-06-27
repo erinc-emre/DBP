@@ -43,7 +43,9 @@ class Config:
     lon_offset_deg = -168.0  # texture longitude calibration
     alt_target_frac = 0.06  # max altitude drawn as this fraction of Earth radius
     route_bevel = 0.03  # route tube thickness (Blender units)
-    forward_sign = 1.0  # +1 if model nose is +Y, -1 if -Y
+    forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
+    smooth_window = 9  # moving-average window over waypoints (<=2 disables)
+    smooth_passes = 3  # number of smoothing passes (more = smoother)
     make_chase_cam = True
     chase_back = 2.6  # chase camera distance behind (Blender units)
     chase_up = 1.1  # chase camera height above aircraft
@@ -56,6 +58,29 @@ class Config:
 # --------------------------------------------------------------------------- #
 def earth_radius(cfg):
     return max(bpy.data.objects[cfg.earth_object].dimensions) / 2.0
+
+
+def smooth_points(pts, window, passes):
+    """Moving-average smoothing of a list of 3D points to remove ADS-B jitter.
+
+    Endpoints are held fixed so the path still starts/ends exactly at the
+    airports. Near the ends the window shrinks symmetrically.
+    """
+    n = len(pts)
+    if window < 3 or passes < 1 or n < 3:
+        return list(pts)
+    half = window // 2
+    cur = list(pts)
+    for _ in range(passes):
+        nxt = list(cur)
+        for i in range(1, n - 1):
+            k = min(half, i, n - 1 - i)  # symmetric, shrinking near ends
+            acc = mathutils.Vector((0.0, 0.0, 0.0))
+            for j in range(i - k, i + k + 1):
+                acc += cur[j]
+            nxt[i] = acc / (2 * k + 1)
+        cur = nxt
+    return cur
 
 
 def make_to_xyz(cfg, R, alt_exag):
@@ -231,6 +256,10 @@ def import_flight(json_path, cfg=Config):
 
     pts = [to_xyz(w["lat"], w["lon"], w["alt_m"]) for w in wps]
     trel = [w["t_rel"] for w in wps]
+
+    # Smooth out raw ADS-B jitter so the route line and the aircraft motion
+    # read as a clean flight path rather than a noisy GPS trace.
+    pts = smooth_points(pts, cfg.smooth_window, cfg.smooth_passes)
 
     build_route(cfg, pts)
     build_markers(cfg, to_xyz, data.get("origin"), data.get("destination"))
