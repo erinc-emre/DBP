@@ -48,6 +48,7 @@ class Config:
     forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
+    make_markers = False  # origin/destination sphere markers
     make_chase_cam = True
     chase_back = 2.6  # chase camera distance behind (Blender units)
     chase_up = 1.1  # chase camera height above aircraft
@@ -264,7 +265,12 @@ def import_flight(json_path, cfg=Config):
     pts = smooth_points(pts, cfg.smooth_window, cfg.smooth_passes)
 
     build_route(cfg, pts)
-    build_markers(cfg, to_xyz, data.get("origin"), data.get("destination"))
+    if cfg.make_markers:
+        build_markers(cfg, to_xyz, data.get("origin"), data.get("destination"))
+    else:
+        # ensure no stale markers linger from a previous import
+        _remove("Marker_Origin")
+        _remove("Marker_Dest")
     ac, pos_at, total = animate_aircraft(cfg, pts, trel, f0, f1)
     if cfg.make_chase_cam:
         build_chase_cam(cfg, pos_at, total, f0, f1)
