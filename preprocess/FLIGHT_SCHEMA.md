@@ -2,7 +2,7 @@
 
 This is the **single source of truth** for the JSON that the external preprocessor
 produces and that the Blender add-on consumes. All producers (OpenSky preprocessor,
-sample generator) and consumers (validator, Blender importer) MUST conform to this.
+consumers (validator, Blender importer) MUST conform to this.
 
 ## Top-level object
 
@@ -15,7 +15,7 @@ sample generator) and consumers (validator, Blender importer) MUST conform to th
     "callsign": "DLH401",            // ICAO callsign as broadcast (string, may be null)
     "icao24": "3c6589",              // transponder hex, lowercase (string, may be null)
     "date": "2024-03-21",            // UTC date of departure, ISO YYYY-MM-DD
-    "source": "opensky-rest-tracks", // one of: "opensky-rest-tracks", "opensky-trino", "sample"
+    "source": "opensky-rest-tracks", // one of: "opensky-rest-tracks", "opensky-trino"
     "generated_at": "2024-03-22T10:00:00Z" // ISO 8601 UTC, when this file was produced
   },
 

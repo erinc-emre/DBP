@@ -1,10 +1,14 @@
 # Flight preprocessing pipeline
 
 This directory holds the **external preprocessor** for the Blender flight
-visualization project. It turns flight-tracking data (from the
-[OpenSky Network](https://opensky-network.org/) or a bundled offline sample)
-into a single, self-contained `flight.json` file that the Blender add-on
-imports and animates.
+visualization project. It turns flight-tracking data from the
+[OpenSky Network](https://opensky-network.org/) into a single, self-contained
+`flight.json` file that the Blender add-on imports and animates.
+
+**Offline mode:** a `flight.json` produced once from a real OpenSky request is
+fully self-contained — commit/keep it and re-import it any time without touching
+the API. (There is intentionally **no synthetic sample data**; offline = a saved
+real flight.)
 
 ## Purpose: why preprocess outside Blender?
 
@@ -35,14 +39,12 @@ flowchart LR
     end
     subgraph Preprocessor [External preprocessor]
         D[opensky_to_flightjson.py]
-        E[make_sample_flight.py]
         F[validate_flight_json.py]
     end
     A --> D
     B --> D
     C --> D
-    D --> G[flight.json]
-    E --> G
+    D --> G[flight.json<br/>saved = offline mode]
     G --> F
     F -->|PASS| H[Blender add-on<br/>imports flight.json + weather.png]
 ```
@@ -111,15 +113,8 @@ python3 opensky_to_flightjson.py \
 > ⚠️ **REST tracks are experimental and only cover roughly the last 30 days.**
 > For older flights you need the Trino historical interface (below).
 
-### `make_sample_flight.py` — offline bundled sample
-
-No network, no credentials. Generates a smooth, realistic JFK→FRA great-circle
-trajectory (`LH401` / `DLH401`) for development and demos:
-
-```bash
-python3 make_sample_flight.py
-# writes preprocess/sample_flight.json
-```
+Once written, that `flight.json` **is** the offline dataset — re-import it in
+Blender any time with no network/credentials.
 
 ### `validate_flight_json.py` — check any flight.json
 
@@ -127,7 +122,6 @@ Run this on every produced file before handing it to Blender:
 
 ```bash
 python3 validate_flight_json.py flight.json
-python3 validate_flight_json.py sample_flight.json
 ```
 
 It prints `PASS` (exit 0) or `FAIL` with a bullet list of every problem
@@ -175,7 +169,7 @@ The full, authoritative contract is in
 | `meta.callsign` | str\|null | ICAO callsign as broadcast, e.g. `DLH401` |
 | `meta.icao24` | str\|null | transponder hex, lowercase |
 | `meta.date` | str | UTC departure date, ISO `YYYY-MM-DD` |
-| `meta.source` | str | `opensky-rest-tracks` \| `opensky-trino` \| `sample` |
+| `meta.source` | str | `opensky-rest-tracks` \| `opensky-trino` |
 | `meta.generated_at` | str | ISO 8601 UTC timestamp of generation |
 | `origin` / `destination` | obj\|null | `{icao, iata, name, lat, lon}`; null if unknown |
 | `waypoints[]` | list (≥2) | chronological track samples |

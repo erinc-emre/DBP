@@ -12,7 +12,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | Item | Status | Notes / gap |
 |---|---|---|
 | `flight.json` schema contract | ✅ | `preprocess/FLIGHT_SCHEMA.md` (v1, SI units) |
-| Offline sample flight (JFK→FRA) | ✅ | `make_sample_flight.py` → `sample_flight.json` |
+| Offline mode | ✅ | A saved real `flight.json` is self-contained (no synthetic sample data; offline = reuse a saved real flight) |
 | Schema validator | ✅ | `validate_flight_json.py` |
 | Airports lookup | 🟡 | `airports.py` (42 airports), now used by the preprocessor too; still misses many ICAO codes (e.g. OJAI) → some coords resolve to null. Consider full OurAirports dataset. |
 | OpenSky REST preprocessor | ✅ | `opensky_to_flightjson.py`; proven against the **live API** (real flight UAE44 EDDF→OJAI, 357 waypoints) |
@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | **Live REST fetch proven** | ✅ | departures→icao24 + `/tracks` fetch worked; output passed the validator + rendered in Blender. (Fair use: only 2 credit-calls used in testing) |
 | Trino historical access | ❌ | No research-access application submitted; >30-day history impossible until then |
 | `/tracks` 30-day limit handling | 🟡 | Documented + enforced; no automatic fallback strategy for older flights |
-| Real demo flight chosen | ✅ | Canonical demo is now a **real** flight: `preprocess/flight.json` (DLH67K, Frankfurt EDDF → Madrid LEMD, 425 waypoints). `make_sample_flight.py`/`sample_flight.json` kept only as offline fallback. |
+| Real demo flight chosen | ✅ | Canonical demo is a **real** saved flight: `preprocess/flight.json` (DLH67K, Frankfurt EDDF → Madrid LEMD, 425 waypoints). Synthetic sample data removed. |
 | Speed for REST tracks | 🟡 | Derived from waypoints (tracks lack velocity) — approximate, not source-true |
 
 ## 2. Weather (entire branch untouched)

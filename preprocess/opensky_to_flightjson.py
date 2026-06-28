@@ -2,7 +2,7 @@
 """Fetch a real flight trajectory from the OpenSky Network REST API and emit a
 `flight.json` conforming to FLIGHT_SCHEMA.md (v1).
 
-This is the "live" counterpart to ``make_sample_flight.py``. It resolves an
+It resolves an
 aircraft (by ICAO callsign + departure airport, or directly by icao24 hex),
 pulls its trajectory via the experimental ``/tracks/all`` endpoint, and maps
 each waypoint into the shared schema. All output is in SI units (meters,
@@ -276,12 +276,12 @@ def resolve_by_callsign(api, callsign, dep_icao, begin, end, date_str):
             matches.append(fd)
 
     if not matches:
-        sample = sorted(
+        seen_callsigns = sorted(
             {(fd.callsign or "").strip().upper() for fd in flights if fd.callsign}
         )[:15]
         raise SystemExit(
             f"ERROR: callsign {target} not found among departures from {dep} on "
-            f"{date_str}. Some callsigns seen: {', '.join(sample) or '(none)'}"
+            f"{date_str}. Some callsigns seen: {', '.join(seen_callsigns) or '(none)'}"
         )
 
     # Prefer a flight whose firstSeen is on the requested UTC date.

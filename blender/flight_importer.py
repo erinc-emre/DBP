@@ -406,9 +406,7 @@ if __name__ == "__main__":
     import os
 
     here = os.path.dirname(os.path.abspath(__file__))
-    # Canonical demo = a REAL flight (preprocess/flight.json). The synthetic
-    # sample_flight.json remains as an offline fallback if flight.json is absent.
-    pre = os.path.join(here, "..", "preprocess")
-    real = os.path.join(pre, "flight.json")
-    default = real if os.path.isfile(real) else os.path.join(pre, "sample_flight.json")
+    # Offline demo = a saved real flight (preprocess/flight.json), produced by the
+    # preprocessor from an OpenSky request and reused without hitting the API.
+    default = os.path.join(here, "..", "preprocess", "flight.json")
     print(import_flight(os.path.normpath(default)))

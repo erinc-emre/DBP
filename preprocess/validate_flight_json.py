@@ -23,7 +23,7 @@ import sys
 # Constants
 # --------------------------------------------------------------------------- #
 SCHEMA_VERSION = 1
-VALID_SOURCES = {"opensky-rest-tracks", "opensky-trino", "sample"}
+VALID_SOURCES = {"opensky-rest-tracks", "opensky-trino"}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # Tolerances from the schema rules.
