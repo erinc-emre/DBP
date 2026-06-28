@@ -52,6 +52,9 @@ class Config:
     make_chase_cam = True
     chase_back = 2.6  # chase camera distance behind (Blender units)
     chase_up = 1.1  # chase camera height above aircraft
+    frame_camera = True  # aim the overview camera at the route after building
+    camera_object = "Camera_T3"  # overview camera to frame
+    overview_distance = 2.2  # overview camera distance = Earth radius * this
     frame_start = None  # None -> use scene.frame_start
     frame_end = None  # None -> use scene.frame_end
 
@@ -136,20 +139,14 @@ def make_surface_sampler(earth_obj, fallback_r):
     return surface_radius
 
 
-def make_to_xyz(cfg, surface_radius, alt_unit_per_m, center):
-    """Place (lat,lon,alt) at  surface_radius(dir) + alt*scale  along the direction.
+def project_waypoint(wp, off, surface_radius, alt_unit_per_m, center):
+    """Place a waypoint at  surface_radius(dir) + alt*scale  along its direction.
 
     Hugs the real terrain at alt=0 (airports sit on the surface) and lifts the
     aircraft by an exaggerated-but-proportional altitude offset.
     """
-    off = cfg.lon_offset_deg
-
-    def to_xyz(lat, lon, alt_m):
-        d = _unit_dir(lat, lon, off)
-        rr = surface_radius(d) + alt_m * alt_unit_per_m
-        return center + rr * d
-
-    return to_xyz
+    d = _unit_dir(wp["lat"], wp["lon"], off)
+    return center + (surface_radius(d) + wp["alt_m"] * alt_unit_per_m) * d
 
 
 def _emissive(name, rgb, strength):
@@ -189,26 +186,22 @@ def build_route(cfg, pts):
     return obj
 
 
-def _path_sampler(pts, trel):
-    total = trel[-1]
-
-    def pos_at(tr):
-        if tr <= trel[0]:
-            return pts[0]
-        if tr >= total:
-            return pts[-1]
-        lo, hi = 0, len(trel) - 1
-        while hi - lo > 1:
-            mid = (lo + hi) // 2
-            if trel[mid] <= tr:
-                lo = mid
-            else:
-                hi = mid
-        span = trel[hi] - trel[lo]
-        f = (tr - trel[lo]) / span if span > 0 else 0.0
-        return pts[lo].lerp(pts[hi], f)
-
-    return pos_at, total
+def position_at(pts, trel, tr):
+    """3D position at relative time `tr` (linear interpolation between waypoints)."""
+    if tr <= trel[0]:
+        return pts[0]
+    if tr >= trel[-1]:
+        return pts[-1]
+    lo, hi = 0, len(trel) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if trel[mid] <= tr:
+            lo = mid
+        else:
+            hi = mid
+    span = trel[hi] - trel[lo]
+    f = (tr - trel[lo]) / span if span > 0 else 0.0
+    return pts[lo].lerp(pts[hi], f)
 
 
 def _orient(fwd, radial, forward_sign):
@@ -228,31 +221,32 @@ def animate_aircraft(cfg, pts, trel, f0, f1):
     if ac.animation_data:
         ac.animation_data_clear()
     ac.rotation_mode = "XYZ"
-    pos_at, total = _path_sampler(pts, trel)
+    total = trel[-1]
     nf = max(f1 - f0, 1)
     for f in range(f0, f1 + 1):
         tr = (f - f0) / nf * total
-        p = pos_at(tr)
-        pn = pos_at(min(tr + total * 0.01, total))
+        p = position_at(pts, trel, tr)
+        pn = position_at(pts, trel, min(tr + total * 0.01, total))
         ac.location = p
         ac.rotation_euler = _orient(pn - p, p.normalized(), cfg.forward_sign)
         ac.keyframe_insert("location", frame=f)
         ac.keyframe_insert("rotation_euler", frame=f)
-    return ac, pos_at, total
+    return ac
 
 
-def build_chase_cam(cfg, pos_at, total, f0, f1):
+def build_chase_cam(cfg, pts, trel, f0, f1):
     _remove("ChaseCam")
     cdata = bpy.data.cameras.new("ChaseCam")
     cdata.lens = 35
     chase = bpy.data.objects.new("ChaseCam", cdata)
     bpy.context.scene.collection.objects.link(chase)
     chase.rotation_mode = "XYZ"
+    total = trel[-1]
     nf = max(f1 - f0, 1)
     for f in range(f0, f1 + 1):
         tr = (f - f0) / nf * total
-        p = pos_at(tr)
-        pn = pos_at(min(tr + total * 0.01, total))
+        p = position_at(pts, trel, tr)
+        pn = position_at(pts, trel, min(tr + total * 0.01, total))
         fwd = pn - p
         fwd = fwd.normalized() if fwd.length > 1e-6 else mathutils.Vector((0, 1, 0))
         up = p.normalized()
@@ -262,6 +256,24 @@ def build_chase_cam(cfg, pos_at, total, f0, f1):
         chase.keyframe_insert("location", frame=f)
         chase.keyframe_insert("rotation_euler", frame=f)
     return chase
+
+
+def frame_overview_camera(cfg, pts):
+    """Aim the overview camera at the route's mid-direction, from outside the globe."""
+    cam = bpy.data.objects.get(cfg.camera_object)
+    if cam is None:
+        return None
+    earth = bpy.data.objects[cfg.earth_object]
+    center = earth.matrix_world.translation.copy()
+    radius = max(earth.dimensions) / 2.0
+    mid = sum((p.normalized() for p in pts), mathutils.Vector()).normalized()
+    if cam.animation_data:
+        cam.animation_data_clear()
+    cam.rotation_mode = "XYZ"
+    cam.location = center + mid * (radius * cfg.overview_distance)
+    cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
+    bpy.context.scene.camera = cam
+    return cam
 
 
 def _subsolar_dir(t_unix, off):
@@ -360,21 +372,26 @@ def import_flight(json_path, cfg=Config):
     # the surface; offset is linear in altitude.
     alt_unit_per_m = (cfg.alt_target_frac * R_base) / max_alt
     surface_radius = make_surface_sampler(earth, R_base)
-    to_xyz = make_to_xyz(cfg, surface_radius, alt_unit_per_m, center)
 
-    pts = [to_xyz(w["lat"], w["lon"], w["alt_m"]) for w in wps]
+    off = cfg.lon_offset_deg
+    pts = [
+        project_waypoint(w, off, surface_radius, alt_unit_per_m, center) for w in wps
+    ]
     trel = [w["t_rel"] for w in wps]
 
     # Smooth out raw ADS-B jitter so the route line and the aircraft motion
     # read as a clean flight path rather than a noisy GPS trace.
     pts = smooth_points(pts, cfg.smooth_window, cfg.smooth_passes)
 
+    # (data["origin"]/["destination"] are metadata only — not drawn in the scene.)
     build_route(cfg, pts)
-    ac, pos_at, total = animate_aircraft(cfg, pts, trel, f0, f1)
+    animate_aircraft(cfg, pts, trel, f0, f1)
     if cfg.sync_sun:
         animate_sun(cfg, wps, f0, f1)
     if cfg.make_chase_cam:
-        build_chase_cam(cfg, pos_at, total, f0, f1)
+        build_chase_cam(cfg, pts, trel, f0, f1)
+    if cfg.frame_camera:
+        frame_overview_camera(cfg, pts)
 
     scn.frame_set(f0)
     return {
