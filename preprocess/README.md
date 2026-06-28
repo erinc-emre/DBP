@@ -35,7 +35,6 @@ flowchart LR
     subgraph Sources
         A[OpenSky REST API<br/>tracks &le; 30 days]
         B[OpenSky Trino<br/>historical, research access]
-        C[OurAirports<br/>airports.py / CSV]
     end
     subgraph Preprocessor [External preprocessor]
         D[opensky_to_flightjson.py]
@@ -43,7 +42,6 @@ flowchart LR
     end
     A --> D
     B --> D
-    C --> D
     D --> G[flight.json<br/>saved = offline mode]
     G --> F
     F -->|PASS| H[Blender add-on<br/>imports flight.json + weather.png]
@@ -86,8 +84,12 @@ you can install it editable so it's importable from anywhere:
 pip install -e opensky-api/python
 ```
 
-`validate_flight_json.py` and `airports.py` are **stdlib-only** and need no
-dependencies.
+`validate_flight_json.py` is **stdlib-only** and needs no dependencies.
+
+> **No hardcoded airport coordinates.** Origin/destination positions are derived
+> dynamically from the track's first/last waypoints (the actual departure/arrival
+> points); the ICAO code comes from the API. Nothing about airport locations is
+> stored locally.
 
 ## Usage
 

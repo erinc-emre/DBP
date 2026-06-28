@@ -14,7 +14,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | `flight.json` schema contract | ✅ | `preprocess/FLIGHT_SCHEMA.md` (v1, SI units) |
 | Offline mode | ✅ | A saved real `flight.json` is self-contained (no synthetic sample data; offline = reuse a saved real flight) |
 | Schema validator | ✅ | `validate_flight_json.py` |
-| Airports lookup | 🟡 | `airports.py` (42 airports), now used by the preprocessor too; still misses many ICAO codes (e.g. OJAI) → some coords resolve to null. Consider full OurAirports dataset. |
+| Airports | ✅ | No hardcoded coordinates: origin/destination positions derived dynamically from the track's first/last waypoints; ICAO from the API. `airports.py` removed. |
 | OpenSky REST preprocessor | ✅ | `opensky_to_flightjson.py`; proven against the **live API** (real flight UAE44 EDDF→OJAI, 357 waypoints) |
 | **OpenSky credentials** | ✅ | `credentials.json` present; OAuth2 token fetch verified |
 | **Live REST fetch proven** | ✅ | departures→icao24 + `/tracks` fetch worked; output passed the validator + rendered in Blender. (Fair use: only 2 credit-calls used in testing) |

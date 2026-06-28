@@ -67,10 +67,12 @@ consumers (validator, Blender importer) MUST conform to this.
 5. Null handling: a waypoint with null lat/lon from the API is dropped. Other nulls
    (alt/heading/speed) are filled per rules above; never leave them null in output.
 6. The file MUST be valid JSON, UTF-8, pretty-printed with 2-space indent.
-7. `origin`/`destination` may be `null` if not resolvable. They may also be an object
-   whose `lat`/`lon` are `null` (airport known by ICAO but coordinates unavailable in
-   the local table). The Blender importer must tolerate both cases (skip the marker
-   when coordinates are missing).
+7. `origin`/`destination` coordinates are derived **dynamically** from the track's
+   first/last waypoints (no hardcoded airport table); the `icao` comes from the API,
+   and `iata`/`name` are `null` (not provided by the API). The whole object may be
+   `null` if not resolvable, or have `null` `lat`/`lon` if no track endpoint was
+   usable. The Blender importer must tolerate all cases (skip the marker when
+   coordinates are missing).
 
 ## Notes for the Blender consumer (informational, not part of the file)
 

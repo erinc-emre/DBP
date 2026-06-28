@@ -121,9 +121,9 @@ def _validate_airport(obj, label, errors):
         elif not _is_str_or_none(obj[key]):
             errors.append(f"{label}.{key}: must be a string or null")
 
-    # lat/lon may be null when the airport is known by ICAO but its coordinates
-    # could not be resolved (e.g. not in the local airports table). When present
-    # as numbers they must be in range. A null-coords airport simply gets no marker.
+    # lat/lon may be null when the airport is known by ICAO but no coordinates
+    # could be derived (e.g. the track had no usable endpoint). When present as
+    # numbers they must be in range. A null-coords airport simply gets no marker.
     if "lat" not in obj:
         errors.append(f"{label}.lat: missing")
     elif obj["lat"] is not None:

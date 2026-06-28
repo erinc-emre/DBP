@@ -10,17 +10,17 @@
   },
   "origin": {
     "icao": "EDDF",
-    "iata": "FRA",
-    "name": "Frankfurt am Main Airport",
-    "lat": 50.0333,
-    "lon": 8.5706
+    "iata": null,
+    "name": null,
+    "lat": 50.0159,
+    "lon": 8.5261
   },
   "destination": {
     "icao": "LEMD",
-    "iata": "MAD",
-    "name": "Adolfo Suarez Madrid-Barajas Airport",
-    "lat": 40.4719,
-    "lon": -3.5626
+    "iata": null,
+    "name": null,
+    "lat": 40.4642,
+    "lon": -3.5266
   },
   "waypoints": [
     {

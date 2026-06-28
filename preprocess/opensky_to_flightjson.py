@@ -49,14 +49,6 @@ sys.path.insert(
 
 import opensky_api  # noqa: E402  (path injected above)
 
-# Optional richer airport table (preprocess/airports.py, ~40+ airports). The
-# small embedded AIRPORTS dict below is a fallback so this module still works
-# standalone if airports.py is missing.
-try:
-    import airports as _airports_mod  # noqa: E402
-except Exception:  # pragma: no cover
-    _airports_mod = None
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -66,101 +58,6 @@ SOURCE = "opensky-rest-tracks"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_OUT = os.path.join(HERE, "output", "flight.json")
-
-# Small embedded airport reference. lat/lon are WGS-84 decimal degrees.
-AIRPORTS = {
-    "KJFK": {
-        "icao": "KJFK",
-        "iata": "JFK",
-        "name": "John F. Kennedy International Airport",
-        "lat": 40.6398,
-        "lon": -73.7789,
-    },
-    "EDDF": {
-        "icao": "EDDF",
-        "iata": "FRA",
-        "name": "Frankfurt am Main Airport",
-        "lat": 50.0333,
-        "lon": 8.5706,
-    },
-    "EGLL": {
-        "icao": "EGLL",
-        "iata": "LHR",
-        "name": "London Heathrow Airport",
-        "lat": 51.4700,
-        "lon": -0.4543,
-    },
-    "KLAX": {
-        "icao": "KLAX",
-        "iata": "LAX",
-        "name": "Los Angeles International Airport",
-        "lat": 33.9416,
-        "lon": -118.4085,
-    },
-    "KSFO": {
-        "icao": "KSFO",
-        "iata": "SFO",
-        "name": "San Francisco International Airport",
-        "lat": 37.6213,
-        "lon": -122.3790,
-    },
-    "RJTT": {
-        "icao": "RJTT",
-        "iata": "HND",
-        "name": "Tokyo Haneda Airport",
-        "lat": 35.5494,
-        "lon": 139.7798,
-    },
-    "OMDB": {
-        "icao": "OMDB",
-        "iata": "DXB",
-        "name": "Dubai International Airport",
-        "lat": 25.2532,
-        "lon": 55.3657,
-    },
-    "WSSS": {
-        "icao": "WSSS",
-        "iata": "SIN",
-        "name": "Singapore Changi Airport",
-        "lat": 1.3644,
-        "lon": 103.9915,
-    },
-    "KORD": {
-        "icao": "KORD",
-        "iata": "ORD",
-        "name": "Chicago O'Hare International Airport",
-        "lat": 41.9742,
-        "lon": -87.9073,
-    },
-    "LFPG": {
-        "icao": "LFPG",
-        "iata": "CDG",
-        "name": "Paris Charles de Gaulle Airport",
-        "lat": 49.0097,
-        "lon": 2.5479,
-    },
-    "EHAM": {
-        "icao": "EHAM",
-        "iata": "AMS",
-        "name": "Amsterdam Airport Schiphol",
-        "lat": 52.3105,
-        "lon": 4.7683,
-    },
-    "VHHH": {
-        "icao": "VHHH",
-        "iata": "HKG",
-        "name": "Hong Kong International Airport",
-        "lat": 22.3080,
-        "lon": 113.9185,
-    },
-    "YSSY": {
-        "icao": "YSSY",
-        "iata": "SYD",
-        "name": "Sydney Kingsford Smith Airport",
-        "lat": -33.9461,
-        "lon": 151.1772,
-    },
-}
 
 
 # ---------------------------------------------------------------------------
@@ -220,23 +117,26 @@ def fmt_duration(seconds):
 # ---------------------------------------------------------------------------
 # Airport resolution
 # ---------------------------------------------------------------------------
-def airport_record(icao):
-    """Return a schema airport dict for the given ICAO code, or a graceful stub.
+def airport_from_waypoint(icao, wp):
+    """Build a schema airport dict dynamically from the API data.
 
-    If the airport is unknown, return a dict with null name/iata and null
-    lat/lon (the schema permits null airports / null coords).
+    The OpenSky track already contains the departure/arrival *positions* (its
+    first / last waypoints), so we never hardcode airport coordinates: lat/lon
+    come straight from the relevant track endpoint, and the ICAO code from the
+    flight record. iata/name are not provided by the API and stay null.
+
+    Returns None if neither an ICAO code nor a waypoint is available.
     """
-    if not icao:
+    icao = (icao or "").strip().upper() or None
+    if icao is None and wp is None:
         return None
-    icao = icao.strip().upper()
-    # Prefer the richer shared table (airports.py) when available.
-    if _airports_mod is not None:
-        rec = _airports_mod.get_by_icao(icao)
-        if rec:
-            return dict(rec)
-    if icao in AIRPORTS:
-        return dict(AIRPORTS[icao])
-    return {"icao": icao, "iata": None, "name": None, "lat": None, "lon": None}
+    return {
+        "icao": icao,
+        "iata": None,
+        "name": None,
+        "lat": float(wp["lat"]) if wp else None,
+        "lon": float(wp["lon"]) if wp else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -452,12 +352,12 @@ def build_flight(args):
     finally:
         api.close()
 
-    # Resolve origin/destination. Explicit CLI args take precedence over the
-    # flight's estimated airports.
+    # Origin/destination: ICAO from the API (CLI args take precedence), and the
+    # coordinates derived dynamically from the track's first/last waypoints.
     dep_icao = args.dep_icao or getattr(flight, "estDepartureAirport", None)
     arr_icao = args.arr_icao or getattr(flight, "estArrivalAirport", None)
-    origin = airport_record(dep_icao)
-    destination = airport_record(arr_icao)
+    origin = airport_from_waypoint(dep_icao, waypoints[0] if waypoints else None)
+    destination = airport_from_waypoint(arr_icao, waypoints[-1] if waypoints else None)
 
     callsign = (flight.callsign or args.callsign or "").strip().upper() or None
 
