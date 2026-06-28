@@ -111,42 +111,15 @@ def _unit_dir(lat, lon, off):
     )
 
 
-def make_surface_sampler(earth_obj, fallback_r):
-    """Return surface_radius(world_dir) that ray-casts the ACTUAL displaced Earth
-    surface in a given direction from the Earth centre.
+def project_waypoint(wp, off, base_radius, alt_unit_per_m, center):
+    """Place a waypoint at  base_radius + alt*scale  along its direction.
 
-    The Earth has terrain displacement (geo-node heightmap), so it is not a clean
-    sphere; a constant radius would make the route float above / sink into the
-    surface. We BVH ray-cast the real mesh and return the hit radius (world units).
-    """
-    from mathutils.bvhtree import (
-        BVHTree,
-    )  # local import (robust against import strippers)
-
-    dg = bpy.context.evaluated_depsgraph_get()
-    bvh = BVHTree.FromObject(earth_obj, dg)  # object-local space
-    mw = earth_obj.matrix_world
-    mwi = mw.inverted()
-    center_world = mw.translation.copy()
-
-    def surface_radius(world_dir):
-        local_dir = (mwi.to_3x3() @ world_dir).normalized()
-        loc, _n, _i, _d = bvh.ray_cast(mathutils.Vector((0.0, 0.0, 0.0)), local_dir)
-        if loc is None:
-            return fallback_r
-        return ((mw @ loc) - center_world).length
-
-    return surface_radius
-
-
-def project_waypoint(wp, off, surface_radius, alt_unit_per_m, center):
-    """Place a waypoint at  surface_radius(dir) + alt*scale  along its direction.
-
-    Hugs the real terrain at alt=0 (airports sit on the surface) and lifts the
-    aircraft by an exaggerated-but-proportional altitude offset.
+    The Earth is a smooth sphere (surface detail comes from the normal map, not
+    geometry), so a constant radius puts airports exactly on the surface and lifts
+    the aircraft by an exaggerated-but-proportional altitude offset.
     """
     d = _unit_dir(wp["lat"], wp["lon"], off)
-    return center + (surface_radius(d) + wp["alt_m"] * alt_unit_per_m) * d
+    return center + (base_radius + wp["alt_m"] * alt_unit_per_m) * d
 
 
 def _emissive(name, rgb, strength):
@@ -371,12 +344,9 @@ def import_flight(json_path, cfg=Config):
     # Max cruise altitude is drawn as alt_target_frac of the (base) radius above
     # the surface; offset is linear in altitude.
     alt_unit_per_m = (cfg.alt_target_frac * R_base) / max_alt
-    surface_radius = make_surface_sampler(earth, R_base)
 
     off = cfg.lon_offset_deg
-    pts = [
-        project_waypoint(w, off, surface_radius, alt_unit_per_m, center) for w in wps
-    ]
+    pts = [project_waypoint(w, off, R_base, alt_unit_per_m, center) for w in wps]
     trel = [w["t_rel"] for w in wps]
 
     # Smooth out raw ADS-B jitter so the route line and the aircraft motion
