@@ -43,7 +43,6 @@ class FlightVizProps(PropertyGroup):
     )
     sync_sun: BoolProperty(name="Sync sun to flight time", default=True)
     chase_cam: BoolProperty(name="Build chase camera", default=True)
-    markers: BoolProperty(name="Origin/destination markers", default=False)
 
 
 def _config_from_props(props):
@@ -54,7 +53,6 @@ def _config_from_props(props):
 
     Cfg.sync_sun = props.sync_sun
     Cfg.make_chase_cam = props.chase_cam
-    Cfg.make_markers = props.markers
     return Cfg
 
 
@@ -96,7 +94,7 @@ class FLIGHTVIZ_OT_build(Operator):
 class FLIGHTVIZ_OT_clear(Operator):
     bl_idname = "flightviz.clear"
     bl_label = "Clear"
-    bl_description = "Remove the generated route, markers and chase camera"
+    bl_description = "Remove the generated route and chase camera"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -123,7 +121,6 @@ class VIEW3D_PT_flightviz(Panel):
         box = layout.box()
         box.prop(props, "sync_sun")
         box.prop(props, "chase_cam")
-        box.prop(props, "markers")
 
         layout.operator("flightviz.build", icon="PLAY")
         layout.operator("flightviz.clear", icon="TRASH")

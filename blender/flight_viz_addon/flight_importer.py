@@ -4,7 +4,6 @@ and build a data-driven flight visualization on an existing Earth sphere.
 
 It creates:
   * a great-circle route curve following the waypoints (altitude-exaggerated),
-  * origin / destination emissive markers,
   * an animated aircraft (the root empty of an imported model) flying the path
     with path-tangent orientation (nose along travel, belly toward Earth),
   * a baked chase camera following the aircraft.
@@ -48,7 +47,6 @@ class Config:
     forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
-    make_markers = False  # origin/destination sphere markers
     sync_sun = True  # drive Sun_T3 from the flight's real UTC time (subsolar point)
     sun_object = "Sun_T3"
     make_chase_cam = True
@@ -191,28 +189,6 @@ def build_route(cfg, pts):
     return obj
 
 
-def build_markers(cfg, to_xyz, origin, destination):
-    out = {}
-    # Always clear previous markers first, so re-importing a different flight
-    # never leaves a stale marker from the prior route.
-    _remove("Marker_Origin")
-    _remove("Marker_Dest")
-    for key, info, rgb in (
-        ("Marker_Origin", origin, (1.0, 0.05, 0.05)),
-        ("Marker_Dest", destination, (0.1, 0.3, 1.0)),
-    ):
-        if not info or info.get("lat") is None:
-            continue
-        bpy.ops.mesh.primitive_uv_sphere_add(
-            radius=0.45, location=to_xyz(info["lat"], info["lon"], 0.0)
-        )
-        o = bpy.context.active_object
-        o.name = key
-        o.data.materials.append(_emissive(key + "_mat", rgb, 8.0))
-        out[key] = o
-    return out
-
-
 def _path_sampler(pts, trel):
     total = trel[-1]
 
@@ -311,7 +287,7 @@ def clear_scene(cfg=Config):
     Leaves the Earth and the aircraft object in place (only clears their
     animation), so a fresh Build can run cleanly.
     """
-    for name in ("FlightRoute", "Marker_Origin", "Marker_Dest", "ChaseCam"):
+    for name in ("FlightRoute", "ChaseCam"):
         _remove(name)
     for obj_name in (cfg.aircraft_root, cfg.sun_object):
         o = bpy.data.objects.get(obj_name)
@@ -394,12 +370,6 @@ def import_flight(json_path, cfg=Config):
     pts = smooth_points(pts, cfg.smooth_window, cfg.smooth_passes)
 
     build_route(cfg, pts)
-    if cfg.make_markers:
-        build_markers(cfg, to_xyz, data.get("origin"), data.get("destination"))
-    else:
-        # ensure no stale markers linger from a previous import
-        _remove("Marker_Origin")
-        _remove("Marker_Dest")
     ac, pos_at, total = animate_aircraft(cfg, pts, trel, f0, f1)
     if cfg.sync_sun:
         animate_sun(cfg, wps, f0, f1)
