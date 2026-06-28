@@ -21,7 +21,15 @@ curl -L -o earth_spec_8k.tif   $B/8k_earth_specular_map.tif
 curl -L -o earth_normal_8k.tif $B/8k_earth_normal_map.tif
 ```
 
-## Legacy low-res maps (still used for displacement / specular)
+## Elevation / displacement
+- `earth_height_8k.png` — real land-elevation heightmap (oceans = 0/flat), 8192×4096,
+  downsampled from NASA Blue Marble **GEBCO** topography (`gebco_08_rev_elev`,
+  21600×10800). **Public domain** (NASA Earth Observatory / Visible Earth).
+  Source: https://visibleearth.nasa.gov/ (image record 73934).
+  Used by `ProcEarthGeo` for geometric displacement at amplitude ≈ 0.015
+  (~4× real-Earth relief — visible mountains, flat oceans, clean limb from orbit).
+
+## Legacy low-res maps (superseded)
 - `earthmap.jpg`, `earthbump.jpg`, `earthspec.jpg`, `earthlights.jpg` (1000×500 / 1024×512)
   — from earlier course homework assets.
 
