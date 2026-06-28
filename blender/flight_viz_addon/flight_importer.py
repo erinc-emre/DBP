@@ -305,6 +305,20 @@ def _subsolar_dir(t_unix, off):
     return _unit_dir(decl, sub_lon, off)
 
 
+def clear_scene(cfg=Config):
+    """Remove everything the importer generates and reset driven animations.
+
+    Leaves the Earth and the aircraft object in place (only clears their
+    animation), so a fresh Build can run cleanly.
+    """
+    for name in ("FlightRoute", "Marker_Origin", "Marker_Dest", "ChaseCam"):
+        _remove(name)
+    for obj_name in (cfg.aircraft_root, cfg.sun_object):
+        o = bpy.data.objects.get(obj_name)
+        if o and o.animation_data:
+            o.animation_data_clear()
+
+
 def animate_sun(cfg, wps, f0, f1):
     """Keyframe the Sun lamp so its direction tracks the real subsolar point over
     the flight's actual time span (Earth turns 15°/h, so a 2 h flight => ~30°).
@@ -408,5 +422,5 @@ if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
     # Offline demo = a saved real flight (preprocess/flight.json), produced by the
     # preprocessor from an OpenSky request and reused without hitting the API.
-    default = os.path.join(here, "..", "preprocess", "flight.json")
+    default = os.path.join(here, "..", "..", "preprocess", "flight.json")
     print(import_flight(os.path.normpath(default)))

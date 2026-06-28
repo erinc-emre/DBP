@@ -57,12 +57,12 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 
 | Item | Status | Notes / gap |
 |---|---|---|
-| `flight_importer.py` engine | ✅ | Callable module, tested live |
-| **Add-on packaging** (`bl_info`, register) | ❌ | Not an installable add-on yet |
-| Sidebar panel (N-panel) | ❌ | No UI |
-| Operators (Load Data / Generate / Reset) | ❌ | None; everything is script-invoked |
-| File pickers / properties | ❌ | Paths + params are hard-coded constants |
-| Scene reset / re-run safety | 🟡 | Importer removes its own objects, but no full "reset scene" operator |
+| `flight_importer.py` engine | ✅ | Engine module inside the add-on package, tested live |
+| **Add-on packaging** (`bl_info`, register) | ✅ | `blender/flight_viz_addon/` — installable add-on |
+| Sidebar panel (N-panel) | ✅ | View3D > Sidebar > **Flight** |
+| Operators (Load / Clear) | ✅ | `flightviz.build` + `flightviz.clear` (Load & Build / Clear) |
+| File pickers / properties | ✅ | Scene `flightviz` props: JSON path + sync-sun / chase-cam / markers toggles |
+| Scene reset / re-run safety | ✅ | `clear_scene()` + Clear operator; Build is idempotent |
 | Frame-range auto-setup | 🟡 | Uses existing 1–96; no derive-from-flight-duration option |
 
 ## 5. Rendering & final deliverable (Part 3)
