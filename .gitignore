@@ -217,21 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# OpenSky API credentials (contains client secret) — never commit
 credentials.json
-
-# Local-only dev log (do not commit)
 DEVLOG.md
-
-# Blender auto-backups
 *.blend1
-
-# Third-party clones with their own git history (used locally, not vendored)
 /blender_mcp/
 /opensky-api/
-
-# Local AI session transcript
 session.md
-
-# opencode config — contains local MCP credentials (Jenkins/OpenSearch), do not commit
 opencode.jsonc
