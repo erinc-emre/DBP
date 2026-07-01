@@ -219,3 +219,6 @@ __marimo__/
 
 # OpenSky API credentials (contains client secret) — never commit
 credentials.json
+
+# Local-only dev log (do not commit)
+DEVLOG.md

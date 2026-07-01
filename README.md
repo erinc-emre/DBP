@@ -195,3 +195,38 @@ Instead of weekly milestones, I will divide the project into three main parts.
 The final result will be a rendered Blender video generated from a custom plugin workflow. The video will show a detailed aircraft flying along a historical commercial route, with Earth, atmosphere, route context, weather visualization, and cinematic camera movement.
 
 The project will demonstrate how Blender can be used not only for manual digital art creation, but also for data-driven visual storytelling.
+
+## Mid-Project Update
+
+### Where the Project Stands
+
+The core pipeline works end to end. An external Python tool pulls a real historical flight from the OpenSky Network and writes a clean `flight.json`; a minimal Blender add-on ("Flight Visualizer", in the sidebar) loads that file and builds the whole scene in one click.
+
+- Demo flight: **Lufthansa DLH67K, Frankfurt → Madrid**.
+- Scene: procedural Earth with 8K day/night/normal/specular textures, real elevation, a cloud layer, the imported Boeing 747-8F animated along the route, and a chase camera.
+- Offline by design: once a flight is fetched, its `flight.json` is reused with no network or API keys.
+
+### High-Level Workflow (Updated)
+
+```mermaid
+flowchart LR
+    A[Flight Number + Date] --> B[OpenSky Preprocessor]
+    B --> C[flight.json]
+    C --> D[Blender Add-on Panel]
+    E[Boeing 747-8F Model] --> D
+    D --> F[Earth + Route + Aircraft + Sun + Camera]
+    F --> G[Rendered Flight Video]
+```
+
+### Interesting Problems Solved
+
+- **Flights aren't searchable by number.** The OpenSky API is keyed on the aircraft transponder (`icao24`), not "LH401", so the tool resolves callsign → `icao24` first, then pulls the track. Auth also had to move to OAuth2.
+- **The route didn't line up with the map.** The path floated over the wrong countries until the Earth texture's exact longitude offset was measured directly from the model's UV data; waypoints now land on the correct geography.
+- **Jittery flight path.** The raw GPS waypoints were noisy, so the path is smoothed before the aircraft follows it.
+- **Lumpy Earth vs. realistic Earth.** The initial heightmap was ~14× exaggerated (a golf-ball look). Real NASA elevation data at a tasteful amplitude now gives visible mountains up close and a clean horizon from orbit.
+- **Day/night that matches the flight.** Instead of spinning the Earth, the sun is positioned from the flight's real UTC timestamps, so a late-evening departure correctly shows Europe at night.
+
+### Still To Come
+
+- Weather visualization (ERA5 → composite texture) — not yet started.
+- Final lighting/camera polish and the rendered video.
