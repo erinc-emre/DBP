@@ -39,29 +39,110 @@ REAL_EARTH_R = 6_371_000.0  # meters
 class Config:
     earth_object = "ProcEarth"
     aircraft_root = "B747_8F"  # root empty/object to animate (already in scene)
+    aircraft_real_length_m = 76.3  # real Boeing 747-8F length
+    aircraft_size_multiplier = 100.0  # draw the plane this many × its real size
     lon_offset_deg = (
         -177.19
     )  # texture longitude calibration (measured from ProcEarth earth_uv)
-    alt_target_frac = 0.06  # max altitude drawn as this fraction of Earth radius
-    route_bevel = 0.03  # route tube thickness (Blender units)
+    # --- Vertical exaggeration (both 1.0 = true-to-scale) ---------------------
+    # Keep these EQUAL for a physically consistent scene: real planes cruise just
+    # above Everest, so if terrain is exaggerated more than altitude the route is
+    # buried in the mountains (and vice-versa).
+    altitude_exaggeration = 10.0  # multiplies real flight altitude (& cloud height)
+    terrain_exaggeration = 1.0  # multiplies real elevation (geo-node displacement)
+    terrain_base_amplitude = 0.00152  # geo-node amplitude for ×1 (real Everest relief)
+    earth_geo_nodegroup = "ProcEarthGeo"
+    cloud_object = "Clouds"  # cloud shell object (optional)
+    cloud_altitude_m = (
+        10000.0  # cloud-layer altitude in real meters (scaled by altitude_exaggeration)
+    )
+    # --------------------------------------------------------------------------
+    route_bevel_factor = 0.08  # route thickness as a fraction of aircraft length
     forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
     sync_sun = True  # drive Sun_T3 from the flight's real UTC time (subsolar point)
     sun_object = "Sun_T3"
     make_chase_cam = True
-    chase_back = 2.6  # chase camera distance behind (Blender units)
-    chase_up = 1.1  # chase camera height above aircraft
+    # chase camera offset from the aircraft, in aircraft lengths (side view frames
+    # the plane better than looking straight down the route)
+    chase_back_factor = 1.2
+    chase_up_factor = 1.2
+    chase_side_factor = 2.5
     frame_camera = True  # aim the overview camera at the route after building
     camera_object = "Camera_T3"  # overview camera to frame
     overview_distance = 2.2  # overview camera distance = Earth radius * this
     frame_start = None  # None -> use scene.frame_start
-    frame_end = None  # None -> use scene.frame_end
+    base_frames = 96  # animation length (frames) at speed 1.0
+    speed = 1.0  # flight animation speed (higher = faster = fewer frames)
 
 
 # --------------------------------------------------------------------------- #
 # Geo helpers
 # --------------------------------------------------------------------------- #
+def apply_terrain_exaggeration(cfg):
+    """Set the geo-node displacement amplitude from cfg.terrain_exaggeration.
+
+    amplitude = terrain_base_amplitude * terrain_exaggeration
+    (base amplitude corresponds to real-Earth relief, i.e. ×1). Returns the
+    amplitude applied, or None if the node group / node isn't found.
+    """
+    ng = bpy.data.node_groups.get(cfg.earth_geo_nodegroup)
+    if ng is None:
+        return None
+    node = next(
+        (n for n in ng.nodes if "height_amplitude" in (n.label or "")), None
+    ) or ng.nodes.get("Math.001")
+    if node is None:
+        return None
+    amp = cfg.terrain_base_amplitude * cfg.terrain_exaggeration
+    node.inputs[1].default_value = amp
+    return amp
+
+
+def set_cloud_altitude(cfg, R_base):
+    """Rescale the cloud shell to a realistic altitude (in scene units).
+
+    radius = R_base + cloud_altitude_m * (R_base / 6371 km) * altitude_exaggeration
+    so the clouds sit at their real height and track the same vertical
+    exaggeration as the flight. Returns the target radius, or None if absent.
+    """
+    o = bpy.data.objects.get(cfg.cloud_object)
+    if o is None:
+        return None
+    cur = max(o.dimensions) / 2.0
+    if cur <= 0:
+        return None
+    target = (
+        R_base
+        + cfg.cloud_altitude_m * (R_base / REAL_EARTH_R) * cfg.altitude_exaggeration
+    )
+    o.scale = tuple(s * (target / cur) for s in o.scale)
+    return target
+
+
+def set_aircraft_scale(cfg, R_base):
+    """Scale the aircraft to  aircraft_size_multiplier × real  at Earth scale.
+
+    length = aircraft_real_length_m * aircraft_size_multiplier * (R_base / 6371 km)
+    Returns the target length (units), or None if the aircraft isn't found.
+    """
+    root = bpy.data.objects.get(cfg.aircraft_root)
+    if root is None:
+        return None
+    cur = aircraft_length(cfg)
+    if cur <= 0:
+        return None
+    target = (
+        cfg.aircraft_real_length_m
+        * cfg.aircraft_size_multiplier
+        * (R_base / REAL_EARTH_R)
+    )
+    root.scale = tuple(s * (target / cur) for s in root.scale)
+    bpy.context.view_layer.update()
+    return target
+
+
 def earth_base_radius(earth_obj):
     """Representative (sea-level) radius of the displaced Earth = min vertex radius.
 
@@ -151,7 +232,8 @@ def build_route(cfg, pts):
     sp.points.add(len(pts) - 1)
     for i, p in enumerate(pts):
         sp.points[i].co = (p.x, p.y, p.z, 1.0)
-    cu.bevel_depth = cfg.route_bevel
+    # thin trail, sized relative to the aircraft so it reads as a line, not a tube
+    cu.bevel_depth = aircraft_length(cfg) * cfg.route_bevel_factor
     cu.bevel_resolution = 2
     cu.materials.append(_emissive("FlightRoute_mat", (1.0, 0.85, 0.2), 4.0))
     obj = bpy.data.objects.new("FlightRoute", cu)
@@ -207,10 +289,38 @@ def animate_aircraft(cfg, pts, trel, f0, f1):
     return ac
 
 
+def aircraft_length(cfg):
+    """Longest world-space dimension of the aircraft (across all child meshes)."""
+    root = bpy.data.objects[cfg.aircraft_root]
+    dg = bpy.context.evaluated_depsgraph_get()
+    coords = []
+
+    def walk(ob):
+        if ob.type == "MESH":
+            oe = ob.evaluated_get(dg)
+            for v in oe.bound_box:
+                coords.append(ob.matrix_world @ mathutils.Vector(v))
+        for c in ob.children:
+            walk(c)
+
+    walk(root)
+    if not coords:
+        return 1.0
+    xs = [c.x for c in coords]
+    ys = [c.y for c in coords]
+    zs = [c.z for c in coords]
+    return max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs))
+
+
 def build_chase_cam(cfg, pts, trel, f0, f1):
     _remove("ChaseCam")
     cdata = bpy.data.cameras.new("ChaseCam")
     cdata.lens = 35
+    L = aircraft_length(cfg)
+    back = L * cfg.chase_back_factor
+    up_off = L * cfg.chase_up_factor
+    side = L * cfg.chase_side_factor
+    cdata.clip_start = max(L * 0.02, 1e-6)  # tiny aircraft -> small near clip
     chase = bpy.data.objects.new("ChaseCam", cdata)
     bpy.context.scene.collection.objects.link(chase)
     chase.rotation_mode = "XYZ"
@@ -223,8 +333,9 @@ def build_chase_cam(cfg, pts, trel, f0, f1):
         fwd = pn - p
         fwd = fwd.normalized() if fwd.length > 1e-6 else mathutils.Vector((0, 1, 0))
         up = p.normalized()
-        chase.location = p + up * cfg.chase_up - fwd * cfg.chase_back
-        look = (p + fwd * 1.0) - chase.location
+        right = fwd.cross(up).normalized()
+        chase.location = p + right * side + up * up_off - fwd * back
+        look = p - chase.location  # look straight at the aircraft
         chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
         chase.keyframe_insert("location", frame=f)
         chase.keyframe_insert("rotation_euler", frame=f)
@@ -234,8 +345,10 @@ def build_chase_cam(cfg, pts, trel, f0, f1):
 def frame_overview_camera(cfg, pts):
     """Aim the overview camera at the route's mid-direction, from outside the globe."""
     cam = bpy.data.objects.get(cfg.camera_object)
-    if cam is None:
-        return None
+    if cam is None:  # create the overview camera if it doesn't exist
+        cdata = bpy.data.cameras.new(cfg.camera_object)
+        cam = bpy.data.objects.new(cfg.camera_object, cdata)
+        bpy.context.scene.collection.objects.link(cam)
     earth = bpy.data.objects[cfg.earth_object]
     center = earth.matrix_world.translation.copy()
     radius = max(earth.dimensions) / 2.0
@@ -335,15 +448,22 @@ def import_flight(json_path, cfg=Config):
 
     scn = bpy.context.scene
     f0 = cfg.frame_start if cfg.frame_start is not None else scn.frame_start
-    f1 = cfg.frame_end if cfg.frame_end is not None else scn.frame_end
+    # Animation length is set by the speed control (higher speed = fewer frames).
+    total_frames = max(2, round(cfg.base_frames / max(cfg.speed, 1e-3)))
+    f1 = f0 + total_frames - 1
+    scn.frame_end = f1
+
+    # Apply the configured terrain exaggeration before measuring the Earth.
+    apply_terrain_exaggeration(cfg)
 
     earth = bpy.data.objects[cfg.earth_object]
     center = earth.matrix_world.translation.copy()
     R_base = earth_base_radius(earth)
-    max_alt = max(w["alt_m"] for w in wps) or 1.0
-    # Max cruise altitude is drawn as alt_target_frac of the (base) radius above
-    # the surface; offset is linear in altitude.
-    alt_unit_per_m = (cfg.alt_target_frac * R_base) / max_alt
+    set_aircraft_scale(cfg, R_base)  # size the plane before route/chase measure it
+    set_cloud_altitude(cfg, R_base)  # keep the cloud shell at a realistic height
+    # True-to-scale altitude: 1 real meter -> R_base/6371 km of scene units.
+    # (altitude_exaggeration = 1.0 keeps it realistic; raise it only to exaggerate.)
+    alt_unit_per_m = (R_base / REAL_EARTH_R) * cfg.altitude_exaggeration
 
     off = cfg.lon_offset_deg
     pts = [project_waypoint(w, off, R_base, alt_unit_per_m, center) for w in wps]
@@ -364,10 +484,11 @@ def import_flight(json_path, cfg=Config):
         frame_overview_camera(cfg, pts)
 
     scn.frame_set(f0)
+    max_alt = max(w["alt_m"] for w in wps)
     return {
         "waypoints": len(pts),
         "earth_base_radius": round(R_base, 3),
-        "max_alt_offset": round(alt_unit_per_m * max_alt, 3),
+        "max_alt_offset": round(alt_unit_per_m * max_alt, 5),
         "frames": [f0, f1],
         "callsign": data.get("meta", {}).get("callsign"),
     }

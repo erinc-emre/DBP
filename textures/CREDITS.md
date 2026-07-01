@@ -1,15 +1,22 @@
 # Texture Credits & Sources
 
-## High-resolution Earth maps (8K, all 8192×4096)
-- `earth_day_8k.jpg`    — daymap (albedo)
-- `earth_night_8k.jpg`  — nightmap / city lights
-- `earth_clouds_8k.jpg` — cloud layer
-- `earth_spec_8k.tif`   — specular / ocean mask (roughness)
-- `earth_normal_8k.tif` — tangent-space normal map (fine surface detail)
+## Highest-res maps in use
+- `earth_day_16k.jpg`   — daymap / albedo, **16384×8192** (downsampled from NASA
+  Blue Marble Next Gen `world.topo.bathy.200412.3x21600x10800`, ~1.85 km/px source)
+- `earth_night_13k.jpg` — nightmap / city lights, **13500×6750** (NASA Earth at Night
+  `dnb_land_ocean_ice.2012.13500x6750`)
+- `earth_clouds_8k.jpg` — cloud layer (8192×4096, Solar System Scope)
+- `earth_spec_8k.tif`   — specular / ocean mask (8192×4096, Solar System Scope)
+- `earth_normal_8k.tif` — tangent-space normal map (8192×4096, Solar System Scope)
 
-**Source:** Solar System Scope — https://www.solarsystemscope.com/textures/
-**License:** Creative Commons Attribution 4.0 International (CC BY 4.0).
-Attribution required if the rendered output is published.
+**Sources:** NASA Visible Earth / Earth Observatory (public domain) for day & night;
+Solar System Scope (CC BY 4.0) for clouds/specular/normal. Attribution required for
+the SSS maps if the render is published.
+
+All Earth texture nodes use **Cubic** interpolation for smoother close-ups.
+
+## Legacy 8K day/night (superseded)
+- `earth_day_8k.jpg`, `earth_night_8k.jpg` (8192×4096, Solar System Scope).
 
 Re-download:
 ```

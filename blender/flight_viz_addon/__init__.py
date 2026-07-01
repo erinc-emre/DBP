@@ -16,7 +16,7 @@ or drop the folder in your add-ons directory and enable "Flight Visualizer".
 import os
 
 import bpy
-from bpy.props import BoolProperty, PointerProperty, StringProperty
+from bpy.props import BoolProperty, FloatProperty, PointerProperty, StringProperty
 from bpy.types import Operator, Panel, PropertyGroup
 
 from . import flight_importer
@@ -43,6 +43,34 @@ class FlightVizProps(PropertyGroup):
     )
     sync_sun: BoolProperty(name="Sync sun to flight time", default=True)
     chase_cam: BoolProperty(name="Build chase camera", default=True)
+    # scale factors
+    plane_scale: FloatProperty(
+        name="Plane size (× real)", default=100.0, min=1.0, soft_max=500.0
+    )
+    altitude_exag: FloatProperty(
+        name="Route altitude (× real)", default=10.0, min=0.1, soft_max=50.0
+    )
+    route_thickness: FloatProperty(
+        name="Route line thickness",
+        default=0.08,
+        min=0.0,
+        soft_max=1.0,
+        description="Route tube thickness as a fraction of the aircraft length",
+    )
+    terrain_exag: FloatProperty(
+        name="Earth relief (× real)",
+        default=1.0,
+        min=0.0,
+        soft_max=20.0,
+        description="Terrain/mountain height exaggeration",
+    )
+    speed: FloatProperty(
+        name="Flight speed",
+        default=1.0,
+        min=0.1,
+        soft_max=10.0,
+        description="Animation speed (higher = faster = fewer frames)",
+    )
 
 
 def _config_from_props(props):
@@ -53,6 +81,11 @@ def _config_from_props(props):
 
     Cfg.sync_sun = props.sync_sun
     Cfg.make_chase_cam = props.chase_cam
+    Cfg.aircraft_size_multiplier = props.plane_scale
+    Cfg.altitude_exaggeration = props.altitude_exag
+    Cfg.route_bevel_factor = props.route_thickness
+    Cfg.terrain_exaggeration = props.terrain_exag
+    Cfg.speed = props.speed
     return Cfg
 
 
@@ -118,9 +151,18 @@ class VIEW3D_PT_flightviz(Panel):
 
         layout.prop(props, "json_path")
 
-        box = layout.box()
-        box.prop(props, "sync_sun")
-        box.prop(props, "chase_cam")
+        col = layout.box().column(align=True)
+        col.label(text="Scale")
+        col.prop(props, "plane_scale")
+        col.prop(props, "altitude_exag")
+        col.prop(props, "route_thickness")
+        col.prop(props, "terrain_exag")
+
+        col = layout.box().column(align=True)
+        col.label(text="Animation")
+        col.prop(props, "speed")
+        col.prop(props, "sync_sun")
+        col.prop(props, "chase_cam")
 
         layout.operator("flightviz.build", icon="PLAY")
         layout.operator("flightviz.clear", icon="TRASH")
