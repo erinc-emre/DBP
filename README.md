@@ -218,6 +218,24 @@ flowchart LR
     F --> G[Rendered Flight Video]
 ```
 
+### Pipeline Sequence
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant P as Preprocessor
+    participant O as OpenSky API
+    participant B as Blender Add-on
+    U->>P: flight number + date
+    P->>O: authenticate + fetch track
+    O-->>P: waypoints (lat, lon, alt, time)
+    P-->>U: flight.json
+    U->>B: Load & Build
+    B-->>U: Earth + route + aircraft + sun + camera
+    U->>B: Render
+    B-->>U: flight video
+```
+
 ### Interesting Problems Solved
 
 - **Flights aren't searchable by number.** The OpenSky API is keyed on the aircraft transponder (`icao24`), not "LH401", so the tool resolves callsign → `icao24` first, then pulls the track. Auth also had to move to OAuth2.
