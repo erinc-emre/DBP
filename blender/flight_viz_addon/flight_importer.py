@@ -315,7 +315,39 @@ def aircraft_length(cfg):
     return max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs))
 
 
-def build_chase_cam(cfg, pts, trel, f0, f1):
+def build_terrain_lookup(cfg, center):
+    """Return  direction -> local surface radius  of the displaced Earth.
+
+    Evaluates the geometry-node-displaced Earth mesh once and indexes its
+    vertices by outward direction in a KD-tree, so callers can ask "how high is
+    the ground beneath this point?" cheaply. Falls back to a flat 0 if the Earth
+    isn't found.
+    """
+    earth = bpy.data.objects.get(cfg.earth_object)
+    if earth is None:
+        return lambda d: 0.0
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = earth.evaluated_get(dg)
+    me = ev.to_mesh()
+    mw = earth.matrix_world
+    kd = mathutils.kdtree.KDTree(len(me.vertices))
+    radii = []
+    for i, v in enumerate(me.vertices):
+        w = mw @ v.co - center
+        r = w.length
+        kd.insert(w / r if r > 1e-9 else mathutils.Vector((0, 0, 1)), i)
+        radii.append(r)
+    kd.balance()
+    ev.to_mesh_clear()
+
+    def query(direction):
+        _co, idx, _dist = kd.find(direction.normalized())
+        return radii[idx]
+
+    return query
+
+
+def build_chase_cam(cfg, pts, trel, f0, f1, center):
     _remove("ChaseCam")
     cdata = bpy.data.cameras.new("ChaseCam")
     cdata.lens = 35
@@ -327,6 +359,7 @@ def build_chase_cam(cfg, pts, trel, f0, f1):
     chase = bpy.data.objects.new("ChaseCam", cdata)
     bpy.context.scene.collection.objects.link(chase)
     chase.rotation_mode = "XYZ"
+    ground_r = build_terrain_lookup(cfg, center)  # local terrain height lookup
     total = trel[-1]
     nf = max(f1 - f0, 1)
     for f in range(f0, f1 + 1):
@@ -335,9 +368,19 @@ def build_chase_cam(cfg, pts, trel, f0, f1):
         pn = position_at(pts, trel, min(tr + total * 0.01, total))
         fwd = pn - p
         fwd = fwd.normalized() if fwd.length > 1e-6 else mathutils.Vector((0, 1, 0))
-        up = p.normalized()
+        up = (p - center).normalized()
         right = fwd.cross(up).normalized()
-        chase.location = p + right * side + up * up_off - fwd * back
+        loc = p + right * side + up * up_off - fwd * back
+        # Keep the chase cam above the ground at takeoff/landing: there the plane is
+        # near 0 altitude and `fwd` tilts radially (climb/descent), so the -fwd*back
+        # term pulls the camera inward, below the surface. Clamp it to sit at least
+        # `up_off` above the terrain directly beneath it (and never below the
+        # aircraft), so it never clips underground for any exaggeration setting.
+        rel = loc - center
+        r_min = max((p - center).length, ground_r(rel) + up_off)
+        if rel.length < r_min:
+            loc = center + rel.normalized() * r_min
+        chase.location = loc
         look = p - chase.location  # look straight at the aircraft
         chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
         chase.keyframe_insert("location", frame=f)
@@ -482,7 +525,7 @@ def import_flight(json_path, cfg=Config):
     if cfg.sync_sun:
         animate_sun(cfg, wps, f0, f1)
     if cfg.make_chase_cam:
-        build_chase_cam(cfg, pts, trel, f0, f1)
+        build_chase_cam(cfg, pts, trel, f0, f1, center)
     if cfg.frame_camera:
         frame_overview_camera(cfg, pts)
 

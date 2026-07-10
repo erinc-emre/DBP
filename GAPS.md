@@ -43,7 +43,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | Route curve + markers | ✅ | Great-circle curve, origin/dest emissive markers |
 | Aircraft animation along path | ✅ | Path-tangent orientation, baked over frames |
 | Chase camera | ✅ | Baked follow cam (`ChaseCam`); `Camera_T3` = overview |
-| **Chase cam clips underground at start/end** | ❌ | TODO: at takeoff/landing the aircraft is at ~0 altitude, so the baked chase-cam offset dips **below the Earth surface**. Fix: clamp the camera radius to stay above the local surface (min clearance), and/or bias it outward/upward during low-altitude climb & descent. |
+| Chase cam clips underground at start/end | ✅ | Terrain-aware clamp: `build_terrain_lookup` indexes the displaced Earth mesh in a KD-tree; each chase-cam keyframe is kept ≥ `up_off` above the ground directly beneath it (and never below the aircraft). Verified above-surface at start/mid/end for altitude exaggeration ×10 **and** ×1 (stress). |
 | **Longitude calibration robustness** | 🟡 | `LON_OFFSET=-168` hand-calibrated for this Earth texture; will break for a different Earth asset |
 | **Altitude exaggeration** | 🟡 | now user-controllable (`altitude_exaggeration`); still a scene-unit offset above the model |
 | **Altitude relative to Earth** | ✅ | `project_waypoint` places at `radius = R_base·(1 + alt_m/R_earth·k)` (radius-relative, `alt_frac_per_m = exaggeration/R_earth`); cloud shell uses the same form. Scale-independent, no absolute "next-to-model" offset, consistent with terrain. |
