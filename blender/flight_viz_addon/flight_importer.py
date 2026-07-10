@@ -69,6 +69,7 @@ class Config:
     chase_back_factor = 1.2
     chase_up_factor = 1.2
     chase_side_factor = 2.5
+    chase_lens = 20.0  # chase-cam focal length in mm (lower = wider = zoomed out)
     frame_camera = True  # aim the overview camera at the route after building
     camera_object = "Camera_T3"  # overview camera to frame
     overview_distance = 2.2  # overview camera distance = Earth radius * this
@@ -350,7 +351,7 @@ def build_terrain_lookup(cfg, center):
 def build_chase_cam(cfg, pts, trel, f0, f1, center):
     _remove("ChaseCam")
     cdata = bpy.data.cameras.new("ChaseCam")
-    cdata.lens = 35
+    cdata.lens = cfg.chase_lens
     L = aircraft_length(cfg)
     back = L * cfg.chase_back_factor
     up_off = L * cfg.chase_up_factor
