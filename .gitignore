@@ -224,3 +224,7 @@ DEVLOG.md
 /opensky-api/
 session.md
 opencode.jsonc
+
+# Rendered output (videos/frames from the add-on's Render Video button)
+/renders/
+*.mp4

@@ -13,10 +13,17 @@ Install: zip this folder and use Blender > Preferences > Add-ons > Install,
 or drop the folder in your add-ons directory and enable "Flight Visualizer".
 """
 
+import datetime
 import os
 
 import bpy
-from bpy.props import BoolProperty, FloatProperty, PointerProperty, StringProperty
+from bpy.props import (
+    BoolProperty,
+    EnumProperty,
+    FloatProperty,
+    PointerProperty,
+    StringProperty,
+)
 from bpy.types import Operator, Panel, PropertyGroup
 
 from . import flight_importer
@@ -70,6 +77,32 @@ class FlightVizProps(PropertyGroup):
         min=0.1,
         soft_max=10.0,
         description="Animation speed (higher = faster = fewer frames)",
+    )
+    # --- Render options -------------------------------------------------------
+    render_dir: StringProperty(
+        name="Render dir",
+        description="Folder for rendered videos ('//' = next to the .blend file)",
+        subtype="DIR_PATH",
+        default="//renders",
+    )
+    render_camera: EnumProperty(
+        name="Camera",
+        description="Which camera to render from",
+        items=[
+            ("ChaseCam", "Chase", "The baked follow camera"),
+            ("Camera_T3", "Overview", "The overview camera framing the whole route"),
+        ],
+        default="ChaseCam",
+    )
+    render_resolution: EnumProperty(
+        name="Resolution",
+        description="Output video resolution",
+        items=[
+            ("540", "540p", "960 x 540"),
+            ("720", "720p", "1280 x 720"),
+            ("1080", "1080p", "1920 x 1080"),
+        ],
+        default="720",
     )
 
 
@@ -136,6 +169,73 @@ class FLIGHTVIZ_OT_clear(Operator):
         return {"FINISHED"}
 
 
+def _set_video_output(render, filepath):
+    """Configure the render for an H.264 MP4 at `filepath` (Blender 4.2 - 5.x)."""
+    imgs = render.image_settings
+    if hasattr(imgs, "media_type"):  # Blender 5.x splits image vs. video
+        imgs.media_type = "VIDEO"
+    imgs.file_format = "FFMPEG"
+    render.ffmpeg.format = "MPEG4"
+    render.ffmpeg.codec = "H264"
+    render.ffmpeg.constant_rate_factor = "MEDIUM"
+    render.filepath = filepath
+
+
+class FLIGHTVIZ_OT_render(Operator):
+    bl_idname = "flightviz.render"
+    bl_label = "Render Video"
+    bl_description = (
+        "Render the animation with the selected camera/resolution to an MP4 in "
+        "the render directory, named with the current date and time"
+    )
+
+    _RES = {"540": (960, 540), "720": (1280, 720), "1080": (1920, 1080)}
+
+    def execute(self, context):
+        props = context.scene.flightviz
+        scn = context.scene
+
+        cam = bpy.data.objects.get(props.render_camera)
+        if cam is None:
+            self.report(
+                {"ERROR"},
+                f"Camera '{props.render_camera}' not found - build the flight first.",
+            )
+            return {"CANCELLED"}
+        scn.camera = cam
+
+        # resolve/create the output directory ('//' resolves next to the .blend)
+        out_dir = bpy.path.abspath(props.render_dir) if props.render_dir else ""
+        if not out_dir:
+            out_dir = bpy.path.abspath("//renders")
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except OSError as exc:
+            self.report({"ERROR"}, f"Cannot create render dir: {exc}")
+            return {"CANCELLED"}
+
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        fname = f"flight_{props.render_camera}_{stamp}.mp4"
+        filepath = os.path.join(out_dir, fname)
+
+        r = scn.render
+        r.resolution_x, r.resolution_y = self._RES[props.render_resolution]
+        r.resolution_percentage = 100
+        r.fps = 24
+        scn.frame_step = 1  # render every frame (guard against a stale step)
+        _set_video_output(r, filepath)
+
+        self.report({"INFO"}, f"Rendering {fname} ...")
+        try:
+            bpy.ops.render.render(animation=True)
+        except Exception as exc:
+            self.report({"ERROR"}, f"Render failed: {exc}")
+            return {"CANCELLED"}
+
+        self.report({"INFO"}, f"Saved video: {filepath}")
+        return {"FINISHED"}
+
+
 # --------------------------------------------------------------------------- #
 # Panel
 # --------------------------------------------------------------------------- #
@@ -167,6 +267,13 @@ class VIEW3D_PT_flightviz(Panel):
         layout.operator("flightviz.build", icon="PLAY")
         layout.operator("flightviz.clear", icon="TRASH")
 
+        col = layout.box().column(align=True)
+        col.label(text="Render")
+        col.prop(props, "render_camera")
+        col.prop(props, "render_resolution")
+        col.prop(props, "render_dir")
+        col.operator("flightviz.render", icon="RENDER_ANIMATION")
+
 
 # --------------------------------------------------------------------------- #
 # Registration
@@ -175,6 +282,7 @@ _classes = (
     FlightVizProps,
     FLIGHTVIZ_OT_build,
     FLIGHTVIZ_OT_clear,
+    FLIGHTVIZ_OT_render,
     VIEW3D_PT_flightviz,
 )
 
