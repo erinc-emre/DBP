@@ -113,9 +113,9 @@ def set_cloud_altitude(cfg, R_base):
     cur = max(o.dimensions) / 2.0
     if cur <= 0:
         return None
-    target = (
-        R_base
-        + cfg.cloud_altitude_m * (R_base / REAL_EARTH_R) * cfg.altitude_exaggeration
+    # radius-relative: fraction of Earth radius, same convention as the flight
+    target = R_base * (
+        1.0 + (cfg.cloud_altitude_m / REAL_EARTH_R) * cfg.altitude_exaggeration
     )
     o.scale = tuple(s * (target / cur) for s in o.scale)
     return target
@@ -192,15 +192,18 @@ def _unit_dir(lat, lon, off):
     )
 
 
-def project_waypoint(wp, off, base_radius, alt_unit_per_m, center):
-    """Place a waypoint at  base_radius + alt*scale  along its direction.
+def project_waypoint(wp, off, R_base, alt_frac_per_m, center):
+    """Place a waypoint at a radius defined RELATIVE to the Earth radius:
 
-    The Earth is a smooth sphere (surface detail comes from the normal map, not
-    geometry), so a constant radius puts airports exactly on the surface and lifts
-    the aircraft by an exaggerated-but-proportional altitude offset.
+        radius = R_base * (1 + alt_m/R_earth * exaggeration)
+
+    i.e. altitude is a fraction of the Earth's radius, not an absolute offset
+    stacked next to the model — so it's scale-independent and consistent with the
+    terrain/clouds by construction. `alt_frac_per_m = exaggeration / R_earth`.
     """
     d = _unit_dir(wp["lat"], wp["lon"], off)
-    return center + (base_radius + wp["alt_m"] * alt_unit_per_m) * d
+    radius = R_base * (1.0 + wp["alt_m"] * alt_frac_per_m)
+    return center + radius * d
 
 
 def _emissive(name, rgb, strength):
@@ -461,12 +464,12 @@ def import_flight(json_path, cfg=Config):
     R_base = earth_base_radius(earth)
     set_aircraft_scale(cfg, R_base)  # size the plane before route/chase measure it
     set_cloud_altitude(cfg, R_base)  # keep the cloud shell at a realistic height
-    # True-to-scale altitude: 1 real meter -> R_base/6371 km of scene units.
+    # Altitude is radius-relative: a fraction of the Earth radius per real meter.
     # (altitude_exaggeration = 1.0 keeps it realistic; raise it only to exaggerate.)
-    alt_unit_per_m = (R_base / REAL_EARTH_R) * cfg.altitude_exaggeration
+    alt_frac_per_m = cfg.altitude_exaggeration / REAL_EARTH_R
 
     off = cfg.lon_offset_deg
-    pts = [project_waypoint(w, off, R_base, alt_unit_per_m, center) for w in wps]
+    pts = [project_waypoint(w, off, R_base, alt_frac_per_m, center) for w in wps]
     trel = [w["t_rel"] for w in wps]
 
     # Smooth out raw ADS-B jitter so the route line and the aircraft motion
@@ -488,7 +491,7 @@ def import_flight(json_path, cfg=Config):
     return {
         "waypoints": len(pts),
         "earth_base_radius": round(R_base, 3),
-        "max_alt_offset": round(alt_unit_per_m * max_alt, 5),
+        "max_alt_offset": round(R_base * alt_frac_per_m * max_alt, 5),
         "frames": [f0, f1],
         "callsign": data.get("meta", {}).get("callsign"),
     }
