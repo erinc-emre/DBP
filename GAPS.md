@@ -42,7 +42,7 @@ Legend: ✅ done · 🟡 partial · ❌ not started
 | Aircraft model imported + scaled | ✅ | Boeing 747-8F GLB, `Aircraft_B747` collection |
 | Route curve + markers | ✅ | Great-circle curve, origin/dest emissive markers |
 | Aircraft animation along path | ✅ | Path-tangent orientation, baked over frames |
-| Chase camera | ✅ | Baked follow cam (`ChaseCam`); `Camera_T3` = overview. Horizon **leveled to the Earth** (up = radial), not world-Z, so it doesn't roll as the plane crosses the globe |
+| Chase camera | ✅ | Baked follow cam (`ChaseCam`); `Camera_T3` = overview. Held **parallel to the Earth's surface** (optical axis = horizontal travel tangent, up = radial): zero pitch & roll vs. the ground at every frame |
 | Chase cam clips underground at start/end | ✅ | Terrain-aware clamp: `build_terrain_lookup` indexes the displaced Earth mesh in a KD-tree; each chase-cam keyframe is kept ≥ `up_off` above the ground directly beneath it (and never below the aircraft). Verified above-surface at start/mid/end for altitude exaggeration ×10 **and** ×1 (stress). |
 | **Longitude calibration robustness** | 🟡 | `LON_OFFSET=-168` hand-calibrated for this Earth texture; will break for a different Earth asset |
 | **Altitude exaggeration** | 🟡 | now user-controllable (`altitude_exaggeration`); still a scene-unit offset above the model |
