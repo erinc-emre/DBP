@@ -78,6 +78,13 @@ class FlightVizProps(PropertyGroup):
         soft_max=10.0,
         description="Animation speed (higher = faster = fewer frames)",
     )
+    chase_lens: FloatProperty(
+        name="Chase cam lens (mm)",
+        default=20.0,
+        min=5.0,
+        soft_max=100.0,
+        description="Chase camera focal length; lower = wider = zoomed out",
+    )
     # --- Render options -------------------------------------------------------
     render_dir: StringProperty(
         name="Render dir",
@@ -119,6 +126,7 @@ def _config_from_props(props):
     Cfg.route_bevel_factor = props.route_thickness
     Cfg.terrain_exaggeration = props.terrain_exag
     Cfg.speed = props.speed
+    Cfg.chase_lens = props.chase_lens
     return Cfg
 
 
@@ -263,6 +271,7 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "speed")
         col.prop(props, "sync_sun")
         col.prop(props, "chase_cam")
+        col.prop(props, "chase_lens")
 
         layout.operator("flightviz.build", icon="PLAY")
         layout.operator("flightviz.clear", icon="TRASH")

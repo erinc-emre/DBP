@@ -221,8 +221,22 @@ def _emissive(name, rgb, strength):
 
 
 def _remove(name):
-    if name in bpy.data.objects:
-        bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
+    obj = bpy.data.objects.get(name)
+    if obj is None:
+        return
+    data = obj.data  # mesh/curve/camera/... referenced by the object
+    bpy.data.objects.remove(obj, do_unlink=True)
+    # Purge the now-orphaned datablock so repeated rebuilds don't pile up
+    # ChaseCam.001, .002, FlightRoute.001, ... (which then collide on .new()).
+    if data is not None and data.users == 0:
+        col = {
+            "Mesh": bpy.data.meshes,
+            "Curve": bpy.data.curves,
+            "Camera": bpy.data.cameras,
+            "Light": bpy.data.lights,
+        }.get(type(data).__name__)
+        if col is not None:
+            col.remove(data)
 
 
 # --------------------------------------------------------------------------- #
