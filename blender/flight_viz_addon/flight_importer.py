@@ -381,29 +381,27 @@ def build_chase_cam(cfg, pts, trel, f0, f1, center):
         if rel.length < r_min:
             loc = center + rel.normalized() * r_min
         chase.location = loc
-        # Orient the camera PARALLEL to the Earth's surface: the optical axis is the
-        # horizontal travel tangent (radial component removed) and up = Earth radial.
-        # So the camera is level with the ground (no pitch, no roll) and looks along
-        # the flight direction, with the horizon across the frame - rather than
-        # tilting down to stare at the plane.
+        # Aim the camera AT the aircraft (so the plane stays framed) while keeping the
+        # horizon LEVEL to the Earth: up = local radial, so the camera's width axis
+        # (local X) stays parallel to the surface (no banking/roll) and the camera
+        # only pitches up/down to follow the plane.
         up_r = (loc - center).normalized()  # Earth radial at the camera = "up"
-        fwd_level = fwd - fwd.dot(up_r) * up_r  # drop the climb/descent component
-        if fwd_level.length > 1e-6:
-            fwd_level.normalize()
-            right_c = fwd_level.cross(up_r)  # camera +X (right)
-            zc = -fwd_level  # camera looks down its local -Z, along travel
+        look = (p - chase.location).normalized()  # look straight at the aircraft
+        right_c = look.cross(up_r)  # perpendicular to radial => width stays level
+        if right_c.length > 1e-6:
+            right_c.normalize()
+            up_c = right_c.cross(look)  # re-orthogonalized camera up
+            zc = -look  # camera looks down its local -Z
             rot = mathutils.Matrix(
                 (
-                    (right_c.x, up_r.x, zc.x),
-                    (right_c.y, up_r.y, zc.y),
-                    (right_c.z, up_r.z, zc.z),
+                    (right_c.x, up_c.x, zc.x),
+                    (right_c.y, up_c.y, zc.y),
+                    (right_c.z, up_c.z, zc.z),
                 )
             )
             chase.rotation_euler = rot.to_euler()
-        else:  # travel is (near) purely radial: fall back to looking at the plane
-            chase.rotation_euler = (
-                (p - chase.location).to_track_quat("-Z", "Y").to_euler()
-            )
+        else:  # looking (near) straight along the radial: roll is undefined
+            chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
         chase.keyframe_insert("location", frame=f)
         chase.keyframe_insert("rotation_euler", frame=f)
     return chase
