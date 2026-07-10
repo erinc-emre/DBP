@@ -381,8 +381,26 @@ def build_chase_cam(cfg, pts, trel, f0, f1, center):
         if rel.length < r_min:
             loc = center + rel.normalized() * r_min
         chase.location = loc
-        look = p - chase.location  # look straight at the aircraft
-        chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
+        # Orient the camera to look at the aircraft while keeping the horizon level
+        # to the EARTH (up = local radial), not to world-Z. `to_track_quat` would
+        # lock roll to global up, so the horizon tilts as the plane crosses the
+        # globe; building the basis from the radial up keeps a constant Earth angle.
+        look = (p - chase.location).normalized()
+        right_c = look.cross(up)  # up = (p - center) radial, from the offset calc
+        if right_c.length > 1e-6:
+            right_c.normalize()
+            up_c = right_c.cross(look)  # re-orthogonalized, level to the surface
+            zc = -look  # camera looks down its local -Z
+            rot = mathutils.Matrix(
+                (
+                    (right_c.x, up_c.x, zc.x),
+                    (right_c.y, up_c.y, zc.y),
+                    (right_c.z, up_c.z, zc.z),
+                )
+            )
+            chase.rotation_euler = rot.to_euler()
+        else:  # looking (near) straight down/up the radial: roll is undefined
+            chase.rotation_euler = look.to_track_quat("-Z", "Y").to_euler()
         chase.keyframe_insert("location", frame=f)
         chase.keyframe_insert("rotation_euler", frame=f)
     return chase
