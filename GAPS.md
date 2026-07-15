@@ -44,13 +44,13 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | **Altitude exaggeration** | ✅ | Radius-relative (`radius = R_base·(1 + alt_m/R_earth·k)`) + user-controllable; no scene-unit offset |
 | **Altitude relative to Earth** | ✅ | `project_waypoint` places at `radius = R_base·(1 + alt_m/R_earth·k)` (radius-relative, `alt_frac_per_m = exaggeration/R_earth`); cloud shell uses the same form. Scale-independent, no absolute "next-to-model" offset, consistent with terrain. |
 | Aircraft forward-axis assumption | ✅ | "Model nose axis" **UI enum** (+Y / -Y) → `forward_sign`; no code edit for other models |
-| Banking / pitch on turns | ❌ | Only yaw+radial up; no roll into turns, no climb/descent pitch from vertrate |
+| Banking / pitch on turns | ✅ | Nose follows the 3D path (pitch = climb/descent); `_orient` rolls the aircraft into turns by the tangent-plane heading change (`bank_gain`, clamped to `max_bank_deg`) |
 | Motion smoothing | ✅ | Path resampled to a uniform time grid + smoothed (`resample_uniform`), then **reparametrised to constant arc-length** (`reparametrize_arc`) so the aircraft glides at a **steady speed** — no stalls/surges even where the raw track froze then jumped (min/max step ≈ mean). HUD keeps the true clock via `atime` |
 | Labels / HUD (alt, speed, time, ETA) | ✅ | `FlightHUD` Font object parented to the chase cam (top-left overlay); a `frame_change_post` handler swaps per-frame text (callsign, altitude, speed km/h, UTC, elapsed/total) from values stored on the scene — works during renders too |
 | Multiple cameras / cinematic shots | ✅ (by choice) | Deliberately **chase-cam only** — overview camera + orbit removed to keep it simple |
-| Atmosphere glow | ❌ | Not added |
+| Atmosphere glow | ✅ | `build_atmosphere`: a slightly larger sphere with fresnel-driven blue emission (transparent face-on) → glowing limb halo |
 | Night-side subject visibility | ✅ | Chase-cam 'headlight' sun (`build_subject_light`) keeps the plane & airport lit on the night side (UI-tunable) |
-| Lighting/color polish | ❌ | Default EEVEE look; no grading (beyond the night fill light) |
+| Lighting/color polish | ✅ | `apply_grade`: AgX "Medium High Contrast" view look + a compositor **Bloom** glare (Blender 5.x node-group compositor) on the bright areas |
 
 ## 4. Add-on / UX (Part 2 of the plan)
 
@@ -93,9 +93,8 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 
 *(Weather is descoped — see §2. All former 🟡 partials are now complete.)*
 
-Remaining ❌ (all "nice-to-have" polish, not partials):
+Remaining ❌:
 
-1. **Turn banking + climb/descent pitch** — roll into turns, pitch from vertical rate.
-2. **HUD / labels** — altitude, speed, time, ETA overlay.
-3. **Lighting/color grade + atmosphere glow** — lift the default EEVEE look.
-4. **Trino historical access** — external application; only needed for flights >30 days old.
+1. **Trino historical access** — external application; only needed for flights >30 days old.
+
+Everything else (banking, HUD, airports, night light, atmosphere, color grade, constant-speed motion) is done. Optional next: render the final deliverable video; fill in the final-presentation deck.

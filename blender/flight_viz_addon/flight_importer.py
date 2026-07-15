@@ -62,6 +62,8 @@ class Config:
     # --------------------------------------------------------------------------
     route_bevel_factor = 0.08  # route thickness as a fraction of aircraft length
     forward_sign = -1.0  # +1 if model nose is +Y, -1 if -Y (B747 GLB nose is -Y)
+    bank_gain = 4.0  # roll into turns: bank angle per unit heading-change (0 = none)
+    max_bank_deg = 30.0  # clamp the banking to a realistic maximum
     smooth_window = 9  # moving-average window over waypoints (<=2 disables)
     smooth_passes = 3  # number of smoothing passes (more = smoother)
     sync_sun = True  # drive Sun_T3 from the flight's real UTC time (subsolar point)
@@ -82,6 +84,15 @@ class Config:
     make_subject_light = True  # a fill light on the chase cam so the plane/airport
     subject_light_object = "SubjectFill"  # stay visible on the night side
     subject_light_energy = 0.5  # camera 'headlight' sun strength (W/m^2)
+    make_atmosphere = True  # glowing atmosphere halo around the Earth limb
+    atmosphere_object = "Atmosphere"
+    atmosphere_height_frac = 0.02  # shell radius = R_base * (1 + this)
+    atmosphere_color = (0.35, 0.55, 1.0)  # sky blue
+    atmosphere_strength = 2.0  # emission strength at the limb
+    atmosphere_blend = 0.25  # fresnel blend (higher = broader halo)
+    make_grade = True  # view-transform look + a compositor bloom (glare)
+    grade_look = "AgX - Medium High Contrast"
+    bloom_threshold = 0.8  # brightness above which things bloom (city lights, limb)
     overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
@@ -339,12 +350,17 @@ def reparametrize_arc(pts, trel, n):
     return apts, atime
 
 
-def _orient(fwd, radial, forward_sign):
+def _orient(fwd, radial, forward_sign, bank=0.0):
+    """Orientation matrix: nose along `fwd` (so pitch follows the climb/descent),
+    up = local radial, optionally rolled by `bank` radians about the nose to lean
+    the aircraft into a turn."""
     fwd = fwd * forward_sign
     if fwd.length < 1e-6:
         fwd = mathutils.Vector((0, 1, 0))
     fwd.normalize()
     up = (radial - fwd * radial.dot(fwd)).normalized()
+    if bank:
+        up = (mathutils.Matrix.Rotation(bank, 4, fwd) @ up).normalized()
     right = fwd.cross(up)
     return mathutils.Matrix(
         ((right.x, fwd.x, up.x), (right.y, fwd.y, up.y), (right.z, fwd.z, up.z))
@@ -358,12 +374,30 @@ def animate_aircraft(cfg, pts, trel, f0, f1):
     ac.rotation_mode = "XYZ"
     total = trel[-1]
     nf = max(f1 - f0, 1)
-    for f in range(f0, f1 + 1):
-        tr = (f - f0) / nf * total
-        p = position_at(pts, trel, tr)
-        pn = position_at(pts, trel, min(tr + total * 0.01, total))
+    frames = list(range(f0, f1 + 1))
+    locs = [position_at(pts, trel, (f - f0) / nf * total) for f in frames]
+    n = len(locs)
+    max_bank = math.radians(cfg.max_bank_deg)
+    for i, f in enumerate(frames):
+        p = locs[i]
+        nxt = locs[i + 1] if i + 1 < n else 2 * p - locs[i - 1]
+        prv = locs[i - 1] if i > 0 else 2 * p - nxt
+        radial = p.normalized()
+        # signed heading change in the tangent plane -> bank into the turn
+        a = prv - p
+        b = nxt - p
+        a = a - radial * a.dot(radial)
+        b = b - radial * b.dot(radial)
+        if a.length > 1e-9 and b.length > 1e-9:
+            a.normalize()
+            b.normalize()
+            # angle from -a (incoming heading) to b (outgoing), signed about radial
+            dpsi = math.atan2((-a).cross(b).dot(radial), (-a).dot(b))
+        else:
+            dpsi = 0.0
+        bank = max(-max_bank, min(max_bank, -cfg.bank_gain * dpsi))
         ac.location = p
-        ac.rotation_euler = _orient(pn - p, p.normalized(), cfg.forward_sign)
+        ac.rotation_euler = _orient(nxt - p, radial, cfg.forward_sign, bank)
         ac.keyframe_insert("location", frame=f)
         ac.keyframe_insert("rotation_euler", frame=f)
     return ac
@@ -656,6 +690,111 @@ def _place_one(cfg, coll, path, at_point, fwd_vec, center, ground_r, name):
     return root
 
 
+def apply_grade(cfg):
+    """Light color grade: a contrasty view look + a compositor bloom (glare) so the
+    night city lights and the atmosphere limb bloom softly."""
+    scn = bpy.context.scene
+    if not cfg.make_grade:
+        return None
+    try:
+        scn.view_settings.look = cfg.grade_look
+    except (TypeError, AttributeError):
+        pass
+    # Bloom via a compositor Glare node. Blender 5.x stores the compositor as a
+    # node group (scene.compositing_node_group) with a Group Output and a
+    # socket-based Glare; older versions use scene.node_tree + a Composite node.
+    try:
+        _build_bloom(scn, cfg)
+    except Exception:
+        pass  # bloom is optional; the view look above is the main grade
+    return None
+
+
+def _set_socket(node, name, value):
+    sock = node.inputs.get(name)
+    if sock is not None:
+        try:
+            sock.default_value = value
+        except (TypeError, ValueError):
+            pass
+
+
+def _build_bloom(scn, cfg):
+    if hasattr(scn, "compositing_node_group"):  # Blender 5.x node-group compositor
+        ng = bpy.data.node_groups.new("FlightCompositor", "CompositorNodeTree")
+        ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        rl = ng.nodes.new("CompositorNodeRLayers")
+        glare = ng.nodes.new("CompositorNodeGlare")
+        glare.name = "FlightGlare"
+        go = ng.nodes.new("NodeGroupOutput")
+        ng.links.new(rl.outputs["Image"], glare.inputs["Image"])
+        ng.links.new(glare.outputs["Image"], go.inputs[0])
+        _set_socket(glare, "Type", "Bloom")  # 5.x menu-socket label
+        _set_socket(glare, "Threshold", cfg.bloom_threshold)
+        _set_socket(glare, "Size", 0.7)
+        scn.compositing_node_group = ng
+    else:  # legacy compositor
+        scn.use_nodes = True
+        nt = scn.node_tree
+        rl = next((n for n in nt.nodes if n.type == "R_LAYERS"), None) or nt.nodes.new(
+            "CompositorNodeRLayers"
+        )
+        comp = next(
+            (n for n in nt.nodes if n.type == "COMPOSITE"), None
+        ) or nt.nodes.new("CompositorNodeComposite")
+        glare = nt.nodes.new("CompositorNodeGlare")
+        glare.name = "FlightGlare"
+        glare.glare_type = "BLOOM"
+        glare.threshold = cfg.bloom_threshold
+        nt.links.new(rl.outputs["Image"], glare.inputs["Image"])
+        nt.links.new(glare.outputs["Image"], comp.inputs["Image"])
+
+
+def build_atmosphere(cfg, R_base, center):
+    """A slightly larger sphere around the Earth that glows blue at the limb
+    (fresnel-driven emission, transparent face-on) — a cheap atmosphere halo."""
+    _remove(cfg.atmosphere_object)
+    if not cfg.make_atmosphere:
+        return None
+    r = R_base * (1.0 + cfg.atmosphere_height_frac)
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5, radius=r, location=center)
+    obj = bpy.context.active_object
+    obj.name = cfg.atmosphere_object
+    for poly in obj.data.polygons:
+        poly.use_smooth = True
+
+    mat = bpy.data.materials.get(
+        cfg.atmosphere_object + "_mat"
+    ) or bpy.data.materials.new(cfg.atmosphere_object + "_mat")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    trans = nt.nodes.new("ShaderNodeBsdfTransparent")
+    emit = nt.nodes.new("ShaderNodeEmission")
+    emit.inputs[0].default_value = (*cfg.atmosphere_color, 1.0)
+    emit.inputs[1].default_value = cfg.atmosphere_strength
+    lw = nt.nodes.new("ShaderNodeLayerWeight")  # Fresnel output is high at the limb
+    lw.inputs[0].default_value = cfg.atmosphere_blend
+    nt.links.new(lw.outputs[0], mix.inputs[0])  # fresnel -> mix factor
+    nt.links.new(trans.outputs[0], mix.inputs[1])  # face-on -> transparent
+    nt.links.new(emit.outputs[0], mix.inputs[2])  # grazing (limb) -> emission
+    nt.links.new(mix.outputs[0], out.inputs[0])
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+
+    # EEVEE transparency (attr names differ across 4.x / EEVEE-Next)
+    for attr, val in (("surface_render_method", "BLENDED"), ("blend_method", "BLEND")):
+        try:
+            setattr(mat, attr, val)
+        except (AttributeError, TypeError):
+            pass
+    mat.use_backface_culling = False
+    obj.hide_select = True
+    return obj
+
+
 def build_subject_light(cfg, camera):
     """A soft 'headlight' sun parented to the chase cam so the aircraft (and the
     airport at takeoff/landing) stay visible on the night side. A sun (no distance
@@ -702,6 +841,7 @@ def clear_scene(cfg=Config):
         "ChaseCam",
         cfg.hud_object,
         cfg.subject_light_object,
+        cfg.atmosphere_object,
         cfg.overview_object,
     ):
         _remove(name)
@@ -817,6 +957,8 @@ def import_flight(json_path, cfg=Config):
     pts, atime = reparametrize_arc(pts, trel, len(pts))
     trel = list(range(len(pts)))
 
+    build_atmosphere(cfg, R_base, center)  # glowing limb halo around the Earth
+    apply_grade(cfg)  # view look + bloom
     # (data["origin"]/["destination"] are metadata only — not drawn in the scene.)
     place_airports(cfg, pts, center)  # airport model at the departure & arrival ends
     build_route(cfg, pts)

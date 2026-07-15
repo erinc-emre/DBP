@@ -78,6 +78,16 @@ class FlightVizProps(PropertyGroup):
         default=True,
         description="Chase-cam light so the plane/airport stay visible on the night side",
     )
+    atmosphere: BoolProperty(
+        name="Atmosphere glow",
+        default=True,
+        description="Glowing blue halo around the Earth's limb",
+    )
+    grade: BoolProperty(
+        name="Color grade + bloom",
+        default=True,
+        description="Contrasty view look + a compositor bloom on the bright areas",
+    )
     night_light_energy: FloatProperty(
         name="Night light power",
         default=0.5,
@@ -192,6 +202,8 @@ def _config_from_props(props):
     Cfg.airport_target_size = props.airport_size
     Cfg.make_subject_light = props.night_light
     Cfg.subject_light_energy = props.night_light_energy
+    Cfg.make_atmosphere = props.atmosphere
+    Cfg.make_grade = props.grade
     Cfg.aircraft_size_multiplier = props.plane_scale
     Cfg.altitude_exaggeration = props.altitude_exag
     Cfg.route_bevel_factor = props.route_thickness
@@ -354,6 +366,8 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "hud")
         col.prop(props, "night_light")
         col.prop(props, "night_light_energy")
+        col.prop(props, "atmosphere")
+        col.prop(props, "grade")
 
         col = layout.box().column(align=True)
         col.label(text="Calibration")
