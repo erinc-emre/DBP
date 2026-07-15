@@ -173,14 +173,20 @@ It goes through a small **pipeline** before the plane ever moves:
 
 </div>
 
-<div class="mt-3 text-sm">
+<div class="mt-2 text-xs opacity-60">
+
+Techniques: radius-preserving moving average · spherical (great-circle) interpolation · uniform-time resampling · constant arc-length re-parametrization
+
+</div>
+
+<div class="mt-2 text-sm">
 
 **Result** — no more surging, stalling, or flying underground. The biggest per-frame jump dropped from **~17× the normal step to about 1×** (even speed).
 
 </div>
 
 <!--
-Walk the 5-step pipeline in plain terms: place (altitude from local ground), de-jitter (radius-preserving average), follow the curve (great-circle interpolation), even timing (uniform resample), equal distance per frame (constant arc-length). The 17x->1x is the payoff.
+Walk the 5-step pipeline in plain terms. The small techniques line names the actual methods: radius-preserving moving average (de-jitter), spherical/great-circle interpolation (follow the curve), uniform-time resampling (even timing), constant arc-length (equal distance per frame). The 17x->1x is the payoff.
 -->
 
 ---
