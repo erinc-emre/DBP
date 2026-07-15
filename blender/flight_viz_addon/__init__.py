@@ -85,6 +85,26 @@ class FlightVizProps(PropertyGroup):
         soft_max=100.0,
         description="Chase camera focal length; lower = wider = zoomed out",
     )
+    # --- Calibration (per Earth asset / aircraft model) -----------------------
+    lon_offset: FloatProperty(
+        name="Longitude offset (°)",
+        default=-177.19,
+        min=-360.0,
+        max=360.0,
+        description=(
+            "Texture longitude calibration for the Earth. If the route lands on "
+            "the wrong meridian, adjust this until it lines up (asset-specific)"
+        ),
+    )
+    forward_axis: EnumProperty(
+        name="Model nose axis",
+        description="Which local axis the aircraft model's nose points along",
+        items=[
+            ("-Y", "-Y", "Nose points along -Y (Boeing 747-8F GLB)"),
+            ("+Y", "+Y", "Nose points along +Y"),
+        ],
+        default="-Y",
+    )
     # --- Render options -------------------------------------------------------
     render_dir: StringProperty(
         name="Render dir",
@@ -127,6 +147,8 @@ def _config_from_props(props):
     Cfg.terrain_exaggeration = props.terrain_exag
     Cfg.speed = props.speed
     Cfg.chase_lens = props.chase_lens
+    Cfg.lon_offset_deg = props.lon_offset
+    Cfg.forward_sign = 1.0 if props.forward_axis == "+Y" else -1.0
     return Cfg
 
 
@@ -272,6 +294,11 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "sync_sun")
         col.prop(props, "chase_cam")
         col.prop(props, "chase_lens")
+
+        col = layout.box().column(align=True)
+        col.label(text="Calibration")
+        col.prop(props, "lon_offset")
+        col.prop(props, "forward_axis")
 
         layout.operator("flightviz.build", icon="PLAY")
         layout.operator("flightviz.clear", icon="TRASH")
