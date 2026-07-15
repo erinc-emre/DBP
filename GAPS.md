@@ -44,7 +44,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | **Altitude relative to Earth** | ✅ | `project_waypoint` places at `radius = R_base·(1 + alt_m/R_earth·k)` (radius-relative, `alt_frac_per_m = exaggeration/R_earth`); cloud shell uses the same form. Scale-independent, no absolute "next-to-model" offset, consistent with terrain. |
 | Aircraft forward-axis assumption | ✅ | "Model nose axis" **UI enum** (+Y / -Y) → `forward_sign`; no code edit for other models |
 | Banking / pitch on turns | ❌ | Only yaw+radial up; no roll into turns, no climb/descent pitch from vertrate |
-| Motion smoothing | ✅ (accepted) | Moving-average smoothing removes ADS-B jitter; linear interp between waypoints is intentional (constant-velocity segments, real speed preserved) |
+| Motion smoothing | ✅ | Path resampled to a uniform time grid and smoothed over ~2× the per-frame step (`resample_uniform`), fixing the lurch from the raw track's uneven sampling (34 gaps up to 7 min). Peak step/mean 17.6×→2.0×, jerk 63%→21% |
 | Labels / HUD (alt, speed, time, ETA) | ✅ | `FlightHUD` Font object parented to the chase cam (top-left overlay); a `frame_change_post` handler swaps per-frame text (callsign, altitude, speed km/h, UTC, elapsed/total) from values stored on the scene — works during renders too |
 | Multiple cameras / cinematic shots | ✅ (by choice) | Deliberately **chase-cam only** — overview camera + orbit removed to keep it simple |
 | Atmosphere glow | ❌ | Not added |

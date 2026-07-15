@@ -285,6 +285,25 @@ def position_at(pts, trel, tr):
     return pts[lo].lerp(pts[hi], f)
 
 
+def resample_uniform(pts, trel, n, window, passes):
+    """Resample a time-parametrised path to `n` evenly-time-spaced points, then
+    smooth them.
+
+    Real ADS-B tracks are sampled very unevenly (dense clusters + multi-minute
+    gaps), so the piecewise-linear velocity jumps at every waypoint — the aircraft
+    appears to surge and stall. Sampling on a uniform time grid and smoothing that
+    grid removes those velocity discontinuities, giving even motion. Endpoints are
+    preserved (smooth_points holds them fixed).
+    """
+    total = trel[-1]
+    if n < 2 or total <= 0:
+        return list(pts), list(trel)
+    utrel = [total * j / (n - 1) for j in range(n)]
+    upts = [position_at(pts, trel, t) for t in utrel]
+    upts = smooth_points(upts, window, passes)
+    return upts, utrel
+
+
 def _orient(fwd, radial, forward_sign):
     fwd = fwd * forward_sign
     if fwd.length < 1e-6:
@@ -476,16 +495,19 @@ def build_hud(cfg, wps, trel, f0, f1, camera, callsign):
     )  # unlit, always legible
     cur.materials.append(mat)
 
+    # sample scalars on the waypoints' OWN times (trel here may be the resampled
+    # uniform path grid, which has a different length than the waypoint arrays)
+    wtrel = [w["t_rel"] for w in wps]
     alt = [w["alt_m"] for w in wps]
     spd = [w.get("speed_mps", 0.0) or 0.0 for w in wps]
     t0 = wps[0]["t"]
-    total = trel[-1]
+    total = wtrel[-1]
     nf = max(f1 - f0, 1)
     frames = {}
     for f in range(f0, f1 + 1):
         tr = (f - f0) / nf * total
-        a = _sample_scalar(trel, alt, tr)
-        kmh = _sample_scalar(trel, spd, tr) * 3.6
+        a = _sample_scalar(wtrel, alt, tr)
+        kmh = _sample_scalar(wtrel, spd, tr) * 3.6
         utc = datetime.datetime.fromtimestamp(t0 + tr, tz=datetime.timezone.utc)
         frames[str(f)] = (
             f"{callsign}\n"
@@ -631,6 +653,17 @@ def import_flight(json_path, cfg=Config):
     # Smooth out raw ADS-B jitter so the route line and the aircraft motion
     # read as a clean flight path rather than a noisy GPS trace.
     pts = smooth_points(pts, cfg.smooth_window, cfg.smooth_passes)
+
+    # The raw track is sampled very unevenly (dense clusters + multi-minute gaps),
+    # which makes the time-parametrised motion surge and stall. Resample onto a
+    # uniform time grid and smooth it over ~2x the per-frame time step, so the
+    # motion the viewer sees (frame to frame) is even rather than lurching.
+    total_rel = trel[-1]
+    grid_dt = 5.0  # seconds between uniform samples
+    n_uniform = min(6000, max(len(pts), int(total_rel / grid_dt) + 1))
+    frame_dt = total_rel / max(f1 - f0, 1)  # real seconds per animation frame
+    win = max(cfg.smooth_window, int(round(2.0 * frame_dt / grid_dt)) | 1)
+    pts, trel = resample_uniform(pts, trel, n_uniform, win, cfg.smooth_passes)
 
     # (data["origin"]/["destination"] are metadata only — not drawn in the scene.)
     build_route(cfg, pts)
