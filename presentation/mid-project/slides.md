@@ -1,6 +1,6 @@
 # Mid-Project Presentation — Speaker Notes
 
-Source canvas: `mid-project.excalidraw` (each frame = one slide).
+Source canvas: `slides.excalidraw` (each frame = one slide).
 Target: **6–9 min talk + 4–7 min Q&A** (≤ 12–13 min total).
 
 ---

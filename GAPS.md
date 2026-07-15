@@ -98,4 +98,4 @@ Remaining ❌:
 
 1. **Trino historical access** — external application; only needed for flights >30 days old.
 
-Everything else (banking, HUD, airports, night light, atmosphere, color grade, constant-speed motion) is done. Optional next: render the final deliverable video; fill in the final-presentation deck.
+Everything else (banking, HUD, airports, night light, atmosphere, color grade, constant-speed motion) is done. Optional next: render the final deliverable video; refine the final presentation deck in `presentation/final/slides.md`.

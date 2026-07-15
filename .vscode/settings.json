@@ -1,6 +1,6 @@
 {
     "slidev.include": [
         "**/slides.md",
-        "presentation/final-presentation.md"
+        "presentation/final/slides.md"
     ]
 }

@@ -240,5 +240,6 @@ opencode.jsonc
 # Node / Slidev
 node_modules/
 package-lock.json
-presentation/.slidev/
-presentation/dist/
+presentation/**/.slidev/
+presentation/**/node_modules/
+presentation/**/dist/
