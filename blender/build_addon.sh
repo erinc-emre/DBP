@@ -19,6 +19,6 @@ rm -f "$out/flight_viz_addon.zip"
 # Zip the folder itself so it extracts to flight_viz_addon/ (required layout),
 # excluding byte-compiled caches.
 ( cd "$here" && zip -r -q "$out/flight_viz_addon.zip" flight_viz_addon \
-    -x '*/__pycache__/*' '*.pyc' )
+    -x '*/__pycache__/*' '*.pyc' '*/.DS_Store' )
 
 echo "Wrote $out/flight_viz_addon.zip"

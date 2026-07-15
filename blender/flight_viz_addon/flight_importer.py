@@ -78,7 +78,7 @@ class Config:
     make_hud = True  # on-screen HUD (callsign, altitude, speed, UTC, elapsed)
     hud_object = "FlightHUD"
     place_airports = True  # drop the airport model at the departure & arrival ends
-    airport_model_path = "//airport.glb"  # '//' = next to the .blend
+    airport_model_path = "//assets/models/airport.glb"  # '//' = next to the .blend
     airport_target_size = 0.05  # longest dimension of the placed airport, scene units
     airports_collection = "FlightAirports"
     make_subject_light = True  # a fill light on the chase cam so the plane/airport

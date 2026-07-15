@@ -97,7 +97,7 @@ class FlightVizProps(PropertyGroup):
         name="Airport model",
         description="Path to the airport .glb ('//' = next to the .blend)",
         subtype="FILE_PATH",
-        default="//airport.glb",
+        default="//assets/models/airport.glb",
     )
     airport_size: FloatProperty(
         name="Airport size",

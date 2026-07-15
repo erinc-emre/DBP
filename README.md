@@ -219,6 +219,19 @@ The core pipeline works end to end. An external Python tool pulls a real histori
 The add-on needs three objects in the scene — `ProcEarth`, `B747_8F`, `Sun_T3` — which are
 already in the provided `.blend`.
 
+### Repository Layout
+
+```text
+blender/flight_viz_addon/   Blender add-on (UI + scene builder)
+preprocess/                OpenSky fetcher, schema, validator, tests, demo flight.json
+assets/models/             Extra 3D assets used by the add-on (airport.glb)
+textures/                  Earth textures, tracked with relative paths
+presentation/              Slidev final presentation and media
+flight_visualization.blend  Main Blender scene
+DESIGN.md                  Design decisions and implementation notes
+GAPS.md                    Project status tracker
+```
+
 ### High-Level Workflow (Updated)
 
 ```mermaid
@@ -290,7 +303,7 @@ built and rendered entirely by a one-click Blender add-on.
   stops it clipping underground at takeoff/landing. Zoom (lens) is adjustable.
 - **Aircraft dynamics.** The nose pitches along the climb/descent and the aircraft
   **banks into turns**.
-- **Airports.** The provided `airport.glb` is placed at both the departure and arrival
+- **Airports.** The provided `assets/models/airport.glb` is placed at both the departure and arrival
   ends, seated on the terrain and aligned to the runway heading.
 - **HUD.** An on-screen overlay shows callsign, altitude, speed, UTC time, and elapsed/total.
 - **Night visibility + atmosphere + grade.** A chase-cam fill light keeps the subject

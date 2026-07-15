@@ -36,7 +36,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | Static Earth + moving sun (day/night) | ✅ | Geo-node frame-spin removed; sun animated 1→96 |
 | Aircraft model imported + scaled | ✅ | Boeing 747-8F GLB, `Aircraft_B747` collection |
 | Route curve + markers | ✅ | Great-circle curve, origin/dest emissive markers |
-| Airport model at endpoints | ✅ | `airport.glb` placed at departure & arrival (`place_airports`): seated on the terrain, up = radial, runway aligned to the flight direction; size/toggle/path in UI |
+| Airport model at endpoints | ✅ | `assets/models/airport.glb` placed at departure & arrival (`place_airports`): seated on the terrain, up = radial, runway aligned to the flight direction; size/toggle/path in UI |
 | Aircraft animation along path | ✅ | Path-tangent orientation, baked over frames |
 | Chase camera (only camera) | ✅ | Baked follow cam (`ChaseCam`) is the **sole** camera. **Looks at the plane** with the **horizon leveled to the Earth** (up = radial): width axis parallel to the surface (no banking), pitch follows the aircraft |
 | Chase cam clips underground at start/end | ✅ | Terrain-aware clamp: `build_terrain_lookup` indexes the displaced Earth mesh in a KD-tree; each chase-cam keyframe is kept ≥ `up_off` above the ground directly beneath it (and never below the aircraft). Verified above-surface at start/mid/end for altitude exaggeration ×10 **and** ×1 (stress). |
