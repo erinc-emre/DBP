@@ -79,6 +79,9 @@ class Config:
     airport_model_path = "//airport.glb"  # '//' = next to the .blend
     airport_target_size = 0.05  # longest dimension of the placed airport, scene units
     airports_collection = "FlightAirports"
+    make_subject_light = True  # a fill light on the chase cam so the plane/airport
+    subject_light_object = "SubjectFill"  # stay visible on the night side
+    subject_light_energy = 0.5  # camera 'headlight' sun strength (W/m^2)
     overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
@@ -653,6 +656,25 @@ def _place_one(cfg, coll, path, at_point, fwd_vec, center, ground_r, name):
     return root
 
 
+def build_subject_light(cfg, camera):
+    """A soft 'headlight' sun parented to the chase cam so the aircraft (and the
+    airport at takeoff/landing) stay visible on the night side. A sun (no distance
+    falloff) lights the subject and the ground evenly — a point light blows out the
+    near ground because it's much closer than the plane.
+    """
+    _remove(cfg.subject_light_object)
+    if not cfg.make_subject_light or camera is None:
+        return None
+    ld = bpy.data.lights.new(cfg.subject_light_object, type="SUN")
+    ld.energy = cfg.subject_light_energy
+    ld.angle = math.radians(5.0)  # soft-ish shadows
+    obj = bpy.data.objects.new(cfg.subject_light_object, ld)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.parent = camera  # rides with the camera; sun -Z aligns with the view
+    obj.rotation_euler = (0.0, 0.0, 0.0)
+    return obj
+
+
 def _subsolar_dir(t_unix, off):
     """Unit vector (in the scene's geo convention) pointing at the subsolar point
     for a given UTC Unix time: the spot on Earth where the Sun is overhead.
@@ -675,7 +697,13 @@ def clear_scene(cfg=Config):
     Leaves the Earth and the aircraft object in place (only clears their
     animation), so a fresh Build can run cleanly.
     """
-    for name in ("FlightRoute", "ChaseCam", cfg.hud_object, cfg.overview_object):
+    for name in (
+        "FlightRoute",
+        "ChaseCam",
+        cfg.hud_object,
+        cfg.subject_light_object,
+        cfg.overview_object,
+    ):
         _remove(name)
     _clear_airports(cfg)
     bpy.context.scene.pop("flightviz_hud", None)
@@ -800,6 +828,7 @@ def import_flight(json_path, cfg=Config):
     if cfg.make_chase_cam:
         chase = build_chase_cam(cfg, pts, trel, f0, f1, center)
         scn.camera = chase  # make the chase cam the active/rendered camera
+        build_subject_light(cfg, chase)  # keep the plane/airport lit at night
         if cfg.make_hud:
             build_hud(cfg, wps, atime, f0, f1, chase, callsign)
     else:

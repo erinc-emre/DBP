@@ -73,6 +73,18 @@ class FlightVizProps(PropertyGroup):
         soft_max=0.3,
         description="Longest dimension of the placed airport, in scene units",
     )
+    night_light: BoolProperty(
+        name="Night fill light",
+        default=True,
+        description="Chase-cam light so the plane/airport stay visible on the night side",
+    )
+    night_light_energy: FloatProperty(
+        name="Night light power",
+        default=0.5,
+        min=0.0,
+        soft_max=3.0,
+        description="Strength of the chase-cam headlight sun (fill for the night side)",
+    )
     # scale factors
     plane_scale: FloatProperty(
         name="Plane size (× real)", default=100.0, min=1.0, soft_max=500.0
@@ -178,6 +190,8 @@ def _config_from_props(props):
     Cfg.place_airports = props.airports
     Cfg.airport_model_path = props.airport_path
     Cfg.airport_target_size = props.airport_size
+    Cfg.make_subject_light = props.night_light
+    Cfg.subject_light_energy = props.night_light_energy
     Cfg.aircraft_size_multiplier = props.plane_scale
     Cfg.altitude_exaggeration = props.altitude_exag
     Cfg.route_bevel_factor = props.route_thickness
@@ -338,6 +352,8 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "chase_cam")
         col.prop(props, "chase_lens")
         col.prop(props, "hud")
+        col.prop(props, "night_light")
+        col.prop(props, "night_light_energy")
 
         col = layout.box().column(align=True)
         col.label(text="Calibration")

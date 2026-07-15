@@ -49,7 +49,8 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | Labels / HUD (alt, speed, time, ETA) | ✅ | `FlightHUD` Font object parented to the chase cam (top-left overlay); a `frame_change_post` handler swaps per-frame text (callsign, altitude, speed km/h, UTC, elapsed/total) from values stored on the scene — works during renders too |
 | Multiple cameras / cinematic shots | ✅ (by choice) | Deliberately **chase-cam only** — overview camera + orbit removed to keep it simple |
 | Atmosphere glow | ❌ | Not added |
-| Lighting/color polish | ❌ | Default EEVEE look; no grading |
+| Night-side subject visibility | ✅ | Chase-cam 'headlight' sun (`build_subject_light`) keeps the plane & airport lit on the night side (UI-tunable) |
+| Lighting/color polish | ❌ | Default EEVEE look; no grading (beyond the night fill light) |
 
 ## 4. Add-on / UX (Part 2 of the plan)
 
