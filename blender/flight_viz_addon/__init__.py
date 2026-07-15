@@ -15,6 +15,8 @@ or drop the folder in your add-ons directory and enable "Flight Visualizer".
 
 import datetime
 import os
+import subprocess
+import tempfile
 
 import bpy
 from bpy.props import (
@@ -47,6 +49,37 @@ class FlightVizProps(PropertyGroup):
         name="Flight JSON",
         description="Path to a flight.json produced by the preprocessor",
         subtype="FILE_PATH",
+    )
+    # --- Fetch (run the external preprocessor from the UI) --------------------
+    fetch_callsign: StringProperty(
+        name="Callsign",
+        description="ICAO callsign, e.g. DLH67K (needs a departure ICAO to resolve)",
+    )
+    fetch_icao24: StringProperty(
+        name="icao24",
+        description="Transponder hex, e.g. 3c6487 (resolves directly; overrides callsign)",
+    )
+    fetch_dep_icao: StringProperty(
+        name="Departure ICAO",
+        description="Departure airport ICAO (e.g. EDDF) — required with a callsign",
+    )
+    fetch_arr_icao: StringProperty(
+        name="Arrival ICAO",
+        description="Arrival airport ICAO (optional, fills destination metadata)",
+    )
+    fetch_date: StringProperty(
+        name="Date (UTC)",
+        description="Departure date, YYYY-MM-DD (must be within ~30 days)",
+    )
+    credentials_path: StringProperty(
+        name="Credentials",
+        description="OpenSky credentials.json (blank = repo credentials.json)",
+        subtype="FILE_PATH",
+    )
+    python_exe: StringProperty(
+        name="Python",
+        description="Python executable that has 'requests' installed (for the preprocessor)",
+        default="python3",
     )
     sync_sun: BoolProperty(name="Sync sun to flight time", default=True)
     chase_cam: BoolProperty(name="Build chase camera", default=True)
@@ -220,6 +253,82 @@ def _config_from_props(props):
 # --------------------------------------------------------------------------- #
 # Operators
 # --------------------------------------------------------------------------- #
+class FLIGHTVIZ_OT_fetch(Operator):
+    bl_idname = "flightviz.fetch"
+    bl_label = "Fetch & Build"
+    bl_description = (
+        "Run the external preprocessor to download the flight from OpenSky, then "
+        "load & build it. Needs network, credentials, and a recent date (<= ~30 days). "
+        "Uses OpenSky API credits."
+    )
+
+    def execute(self, context):
+        props = context.scene.flightviz
+        date = props.fetch_date.strip()
+        callsign = props.fetch_callsign.strip()
+        icao24 = props.fetch_icao24.strip()
+        if not date:
+            self.report({"ERROR"}, "Enter a date (YYYY-MM-DD).")
+            return {"CANCELLED"}
+        if not callsign and not icao24:
+            self.report({"ERROR"}, "Enter a callsign (+ departure ICAO) or an icao24.")
+            return {"CANCELLED"}
+        if callsign and not icao24 and not props.fetch_dep_icao.strip():
+            self.report({"ERROR"}, "A callsign needs a Departure ICAO to resolve.")
+            return {"CANCELLED"}
+
+        # Resolve the preprocessor + credentials paths (default to the repo layout).
+        addon_dir = os.path.dirname(__file__)
+        repo = os.path.normpath(os.path.join(addon_dir, "..", ".."))
+        script = os.path.join(repo, "preprocess", "opensky_to_flightjson.py")
+        creds = (
+            bpy.path.abspath(props.credentials_path)
+            if props.credentials_path
+            else os.path.join(repo, "credentials.json")
+        )
+        if not os.path.isfile(script):
+            self.report({"ERROR"}, f"Preprocessor not found: {script}")
+            return {"CANCELLED"}
+
+        out = (
+            bpy.path.abspath("//fetched_flight.json")
+            if bpy.data.filepath
+            else os.path.join(tempfile.gettempdir(), "fetched_flight.json")
+        )
+        cmd = [props.python_exe, script, "--date", date, "--out", out]
+        if icao24:
+            cmd += ["--icao24", icao24]
+        else:
+            cmd += ["--callsign", callsign, "--dep-icao", props.fetch_dep_icao.strip()]
+        if props.fetch_arr_icao.strip():
+            cmd += ["--arr-icao", props.fetch_arr_icao.strip()]
+        if os.path.isfile(creds):
+            cmd += ["--credentials", creds]
+
+        self.report({"INFO"}, "Fetching from OpenSky ...")
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        except FileNotFoundError:
+            self.report(
+                {"ERROR"},
+                f"Python '{props.python_exe}' not found (set the Python field).",
+            )
+            return {"CANCELLED"}
+        except subprocess.TimeoutExpired:
+            self.report({"ERROR"}, "Fetch timed out.")
+            return {"CANCELLED"}
+
+        if proc.returncode != 0 or not os.path.isfile(out):
+            tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+            msg = tail[-1] if tail else "unknown error"
+            self.report({"ERROR"}, f"Fetch failed: {msg}")
+            return {"CANCELLED"}
+
+        props.json_path = out
+        self.report({"INFO"}, "Fetched flight.json — building ...")
+        return bpy.ops.flightviz.build()
+
+
 class FLIGHTVIZ_OT_build(Operator):
     bl_idname = "flightviz.build"
     bl_label = "Load & Build"
@@ -341,6 +450,17 @@ class VIEW3D_PT_flightviz(Panel):
         layout = self.layout
         props = context.scene.flightviz
 
+        col = layout.box().column(align=True)
+        col.label(text="Fetch from OpenSky")
+        col.prop(props, "fetch_callsign")
+        col.prop(props, "fetch_dep_icao")
+        col.prop(props, "fetch_icao24")
+        col.prop(props, "fetch_arr_icao")
+        col.prop(props, "fetch_date")
+        col.prop(props, "credentials_path")
+        col.prop(props, "python_exe")
+        col.operator("flightviz.fetch", icon="URL")
+
         layout.prop(props, "json_path")
 
         col = layout.box().column(align=True)
@@ -389,6 +509,7 @@ class VIEW3D_PT_flightviz(Panel):
 # --------------------------------------------------------------------------- #
 _classes = (
     FlightVizProps,
+    FLIGHTVIZ_OT_fetch,
     FLIGHTVIZ_OT_build,
     FLIGHTVIZ_OT_clear,
     FLIGHTVIZ_OT_render,

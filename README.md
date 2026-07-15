@@ -278,6 +278,10 @@ built and rendered entirely by a one-click Blender add-on.
 - **One-click scene.** The **Flight Visualizer** add-on (N-panel) builds the Earth
   route, animates the Boeing 747-8F along it, syncs the sun to the flight's real UTC
   time, and frames a chase camera — then exports an MP4 with the **Render Video** button.
+- **Fetch from the UI.** A **Fetch from OpenSky** box takes a callsign + departure ICAO
+  (or an `icao24`) and a date, runs the preprocessor as a subprocess, and builds the
+  scene directly — no command line. (The heavy deps stay external; needs network,
+  credentials, and a date within ~30 days.)
 - **Smooth, constant-speed motion.** The path is resampled to a uniform time grid and
   then to constant arc-length, so the aircraft glides steadily instead of surging and
   stalling on the raw ADS-B track's uneven sampling.

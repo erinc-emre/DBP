@@ -60,6 +60,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | **Add-on packaging** (`bl_info`, register) | ✅ | `blender/flight_viz_addon/` — installable add-on |
 | Sidebar panel (N-panel) | ✅ | View3D > Sidebar > **Flight** |
 | Operators (Load / Clear) | ✅ | `flightviz.build` + `flightviz.clear` (Load & Build / Clear) |
+| In-UI flight fetch | ✅ | `flightviz.fetch`: enter callsign+dep-ICAO (or icao24) + date → runs the preprocessor as a subprocess → writes `flight.json` → builds. Keeps `requests`/OAuth2 out of Blender |
 | File pickers / properties | ✅ | Scene `flightviz` props: JSON path + sync-sun / chase-cam / markers toggles |
 | Scene reset / re-run safety | ✅ | `clear_scene()` + Clear operator; Build is idempotent; `_remove` purges orphaned datablocks (no `ChaseCam.001…` pile-up) |
 | Chase-cam zoom (lens) control | ✅ | `chase_lens` UI slider (mm) → `Config.chase_lens`; default 20 mm |
