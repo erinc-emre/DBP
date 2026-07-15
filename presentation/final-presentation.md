@@ -117,27 +117,25 @@ Same diagram as the README. Everything meets at flight.json, which is validated 
 
 ---
 
-# Challenge: smooth flight from messy data
+# Cleaning & smoothing the flight data
 
-The real flight data is **rough**: points arrive unevenly, with long gaps —
-sometimes the position freezes, then jumps.
+The raw data is rough: points arrive unevenly, jitter around, and have long gaps.
+It goes through a small **pipeline** before the plane ever moves:
 
-<div class="grid grid-cols-2 gap-6 mt-2 text-sm">
+<div class="grid grid-cols-2 gap-6 mt-3 text-sm">
 
 <div>
 
-**What went wrong**
-- The plane **sped up and stalled** as it played
-- One ocean gap of **2608 km** made the path cut a straight line **through the Earth** — the plane flew underground
+1. **Place on the globe** — turn each lat/lon/altitude into a 3D point, measured from the **ground right below** it
+2. **De-jitter** — average each point with its neighbours to smooth the GPS wobble, but **keep its height** (so it can't sag into the Earth)
+3. **Follow the curve** — between points, move along the **curve of the Earth**, not a straight line through it
 
 </div>
 
 <div>
 
-**How I fixed it**
-- Move the plane by **equal distance each frame** → steady speed
-- Follow the **curve of the Earth** between points, not a straight line
-- Measure altitude from the **ground right below** the plane
+4. **Even out the timing** — re-sample the path at **regular intervals**, so dense spots and long gaps are treated the same
+5. **Equal distance per frame** — finally, space the points so the plane moves the **same distance each frame** → steady speed
 
 </div>
 
@@ -145,12 +143,55 @@ sometimes the position freezes, then jumps.
 
 <div class="mt-3 text-sm">
 
-**Result** — the speed is even (jump-to-average ratio **17.6× → ~1.0×**) and the plane **always stays above the surface**.
+**Result** — no more surging, stalling, or flying underground. The biggest per-frame jump dropped from **~17× the normal step to about 1×** (even speed).
 
 </div>
 
 <!--
-Most important implementation story. Real data is rough; naive time playback fails. The 2608km gap flying underground is a concrete example. Plain-language fixes: equal distance per frame, follow the curve, altitude from the local ground.
+Walk the 5-step pipeline in plain terms: place (altitude from local ground), de-jitter (radius-preserving average), follow the curve (great-circle interpolation), even timing (uniform resample), equal distance per frame (constant arc-length). The 17x->1x is the payoff.
+-->
+
+---
+
+# Realistic plane rotation
+
+The data only gives **position**, not which way the plane faces. I build the
+orientation from the path itself, so it flies naturally.
+
+<div class="grid grid-cols-3 gap-5 mt-4 text-sm">
+
+<div>
+
+**Heading**
+Nose points toward the **next point** on the path — so it always faces where it's going.
+
+</div>
+
+<div>
+
+**Pitch**
+That direction includes going up or down, so the nose **tilts up on climb** and **down on descent** for free.
+
+</div>
+
+<div>
+
+**Bank**
+When the path curves, the plane **leans into the turn** — the sharper the turn, the more it rolls (capped at 30°, like a real airliner).
+
+</div>
+
+</div>
+
+<div class="text-sm mt-5 opacity-85">
+
+"Up" always points **away from the Earth's center**, so the plane sits level on
+the globe instead of drifting as it crosses the world.
+
+</div>
+
+<!--
+Orientation is derived from the path, not the data. Nose to next point (heading + pitch in one), bank from how sharply the path turns (clamped 30 deg), up = Earth radial so it stays level on the sphere.
 -->
 
 ---
