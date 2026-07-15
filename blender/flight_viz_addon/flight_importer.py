@@ -304,6 +304,34 @@ def resample_uniform(pts, trel, n, window, passes):
     return upts, utrel
 
 
+def reparametrize_arc(pts, trel, n):
+    """Resample a path to `n` points evenly spaced in ARC LENGTH (constant speed).
+
+    Time-based playback surges and stalls wherever the raw track's speed varies or
+    (worse) the reported position freezes then jumps. Driving the aircraft by
+    distance instead makes it glide at a constant on-screen speed. Returns
+    (apts, atime): the evenly-spaced positions and the real flight time at each,
+    so the HUD/labels still show the true clock at every point.
+    """
+    cum = [0.0]
+    for i in range(1, len(pts)):
+        cum.append(cum[-1] + (pts[i] - pts[i - 1]).length)
+    total_len = cum[-1]
+    if n < 2 or total_len <= 0:
+        return list(pts), list(trel)
+    apts, atime = [], []
+    j = 0
+    for k in range(n):
+        s = total_len * k / (n - 1)
+        while j < len(cum) - 2 and cum[j + 1] < s:
+            j += 1
+        seg = cum[j + 1] - cum[j]
+        f = (s - cum[j]) / seg if seg > 0 else 0.0
+        apts.append(pts[j].lerp(pts[j + 1], f))
+        atime.append(trel[j] + (trel[j + 1] - trel[j]) * f)
+    return apts, atime
+
+
 def _orient(fwd, radial, forward_sign):
     fwd = fwd * forward_sign
     if fwd.length < 1e-6:
@@ -472,7 +500,7 @@ def _mmss(seconds):
     return f"{s // 60:02d}:{s % 60:02d}"
 
 
-def build_hud(cfg, wps, trel, f0, f1, camera, callsign):
+def build_hud(cfg, wps, atime, f0, f1, camera, callsign):
     """Create a screen-space HUD (a Font object parented to the camera) and store
     the per-frame text on the scene. A frame-change handler swaps the text as the
     animation plays (works during animation renders too).
@@ -495,17 +523,22 @@ def build_hud(cfg, wps, trel, f0, f1, camera, callsign):
     )  # unlit, always legible
     cur.materials.append(mat)
 
-    # sample scalars on the waypoints' OWN times (trel here may be the resampled
-    # uniform path grid, which has a different length than the waypoint arrays)
+    # `atime` gives the real flight time at each arc-length sample; the aircraft
+    # moves by frame fraction along those samples, so map frame -> atime -> the true
+    # clock, then sample alt/speed on the waypoints' OWN times (wtrel).
     wtrel = [w["t_rel"] for w in wps]
     alt = [w["alt_m"] for w in wps]
     spd = [w.get("speed_mps", 0.0) or 0.0 for w in wps]
     t0 = wps[0]["t"]
     total = wtrel[-1]
+    na = len(atime)
     nf = max(f1 - f0, 1)
     frames = {}
     for f in range(f0, f1 + 1):
-        tr = (f - f0) / nf * total
+        fi = (f - f0) / nf * (na - 1)  # arc-sample index for this frame
+        i0 = int(fi)
+        i1 = min(i0 + 1, na - 1)
+        tr = atime[i0] + (atime[i1] - atime[i0]) * (fi - i0)
         a = _sample_scalar(wtrel, alt, tr)
         kmh = _sample_scalar(wtrel, spd, tr) * 3.6
         utc = datetime.datetime.fromtimestamp(t0 + tr, tz=datetime.timezone.utc)
@@ -665,6 +698,13 @@ def import_flight(json_path, cfg=Config):
     win = max(cfg.smooth_window, int(round(2.0 * frame_dt / grid_dt)) | 1)
     pts, trel = resample_uniform(pts, trel, n_uniform, win, cfg.smooth_passes)
 
+    # Drive the aircraft by DISTANCE, not time: reparametrise to constant arc-length
+    # so it glides at a steady on-screen speed and never stalls/surges (robust even
+    # if the raw track froze then jumped). `atime` keeps the real clock per sample
+    # for the HUD; `trel` becomes a plain sample index (linear -> constant speed).
+    pts, atime = reparametrize_arc(pts, trel, len(pts))
+    trel = list(range(len(pts)))
+
     # (data["origin"]/["destination"] are metadata only — not drawn in the scene.)
     build_route(cfg, pts)
     animate_aircraft(cfg, pts, trel, f0, f1)
@@ -676,7 +716,7 @@ def import_flight(json_path, cfg=Config):
         chase = build_chase_cam(cfg, pts, trel, f0, f1, center)
         scn.camera = chase  # make the chase cam the active/rendered camera
         if cfg.make_hud:
-            build_hud(cfg, wps, trel, f0, f1, chase, callsign)
+            build_hud(cfg, wps, atime, f0, f1, chase, callsign)
     else:
         _remove(cfg.hud_object)  # no camera -> no HUD
         scn.pop("flightviz_hud", None)
