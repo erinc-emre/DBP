@@ -261,3 +261,78 @@ sequenceDiagram
 
 - Weather visualization (ERA5 → composite texture) — not yet started.
 - Final lighting/camera polish and the rendered video.
+
+---
+
+## Final Project Update
+
+The project is feature-complete. A real historical flight is turned into a polished,
+animated fly-along on a textured 3D Earth — fetched by an external preprocessor,
+built and rendered entirely by a one-click Blender add-on.
+
+### What it does now
+
+- **Real flight, end to end.** `preprocess/opensky_to_flightjson.py` resolves a
+  callsign to a transponder (`icao24`), pulls the OpenSky track, cleans/derives it,
+  and writes a schema-checked `flight.json`. Demo: **Lufthansa DLH67K, Frankfurt → Madrid**.
+- **One-click scene.** The **Flight Visualizer** add-on (N-panel) builds the Earth
+  route, animates the Boeing 747-8F along it, syncs the sun to the flight's real UTC
+  time, and frames a chase camera — then exports an MP4 with the **Render Video** button.
+- **Smooth, constant-speed motion.** The path is resampled to a uniform time grid and
+  then to constant arc-length, so the aircraft glides steadily instead of surging and
+  stalling on the raw ADS-B track's uneven sampling.
+- **Cinematic chase camera.** Trails the aircraft, looks at it, and keeps its width
+  parallel to the Earth's surface (level horizon, no banking); a terrain-aware clamp
+  stops it clipping underground at takeoff/landing. Zoom (lens) is adjustable.
+- **Aircraft dynamics.** The nose pitches along the climb/descent and the aircraft
+  **banks into turns**.
+- **Airports.** The provided `airport.glb` is placed at both the departure and arrival
+  ends, seated on the terrain and aligned to the runway heading.
+- **HUD.** An on-screen overlay shows callsign, altitude, speed, UTC time, and elapsed/total.
+- **Night visibility + atmosphere + grade.** A chase-cam fill light keeps the subject
+  visible on the night side; a fresnel **atmosphere halo** glows at the limb; an AgX
+  color look plus a compositor **bloom** finish the image.
+- **Everything is configurable** from the sidebar (scale, altitude/terrain exaggeration,
+  animation length/speed, chase lens, calibration, airports, night light, atmosphere, grade).
+
+### Updated Workflow
+
+```mermaid
+flowchart LR
+    A[Callsign + Date] --> B[OpenSky Preprocessor]
+    B --> C[flight.json]
+    C --> D[Flight Visualizer add-on]
+    E[Boeing 747-8F] --> D
+    F[airport.glb] --> D
+    D --> G[Earth + route + aircraft + airports + HUD]
+    G --> H[Chase cam + sun + atmosphere + grade]
+    H --> I[Rendered MP4]
+```
+
+### Interesting Problems Solved (since mid-project)
+
+- **Surging/stalling motion.** The raw track has 30+ multi-minute gaps and even
+  frozen-then-jumping positions; time-based playback lurched. Driving the aircraft by
+  **distance (constant arc-length)** rather than time gives a steady glide.
+- **Chase camera underground.** At takeoff/landing the camera dipped below the surface.
+  A KD-tree of the displaced Earth gives the local ground height, and the camera is
+  clamped above it.
+- **Black night side.** Plane and airport were invisible in the dark; a soft "headlight"
+  **sun** parented to the camera lights the subject without washing out the night Earth
+  (a point light blew out the near ground).
+- **Blender 5.1 compositor.** Bloom had to be built as a **node-group compositor**
+  (`scene.compositing_node_group`) with a socket-based Glare node — the old
+  `scene.node_tree` / `Composite` API is gone.
+
+### Engineering & Docs
+
+- **Add-on packaging:** `./blender/build_addon.sh` → installable `dist/flight_viz_addon.zip`.
+- **Tests:** `preprocess/tests/` (pytest) cover the pure helpers and the JSON validator.
+- **Design rationale:** see [`DESIGN.md`](DESIGN.md); gap/status tracker in `GAPS.md`.
+- **Portable `.blend`:** texture paths are relative and tracked in `textures/`.
+
+### Scope note
+
+**Weather visualization was descoped** to keep the project focused on a solid, reliable
+flight visualization. The only remaining external dependency is OpenSky Trino access,
+needed only for flights older than ~30 days (the REST tracks window).
