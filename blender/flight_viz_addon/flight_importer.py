@@ -76,6 +76,10 @@ class Config:
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
     speed = 1.0  # flight animation speed (higher = faster = fewer frames)
+    # Animation length: "SPEED" = base_frames/speed (every flight same length);
+    # "DURATION" = scale to the real flight time (longer flights => longer clips).
+    frame_mode = "SPEED"
+    time_compression = 1800.0  # DURATION mode: real seconds shown per playback second
 
 
 # --------------------------------------------------------------------------- #
@@ -528,8 +532,14 @@ def import_flight(json_path, cfg=Config):
 
     scn = bpy.context.scene
     f0 = cfg.frame_start if cfg.frame_start is not None else scn.frame_start
-    # Animation length is set by the speed control (higher speed = fewer frames).
-    total_frames = max(2, round(cfg.base_frames / max(cfg.speed, 1e-3)))
+    # Animation length: either a fixed clip divided by speed, or scaled to the
+    # real flight duration (so a 10 h flight plays longer than a 30 min hop).
+    if cfg.frame_mode == "DURATION":
+        real_dur = wps[-1]["t_rel"] - wps[0]["t_rel"]  # seconds of real flight
+        playback_s = real_dur / max(cfg.time_compression, 1e-3)
+        total_frames = max(2, round(playback_s * scn.render.fps))
+    else:  # "SPEED"
+        total_frames = max(2, round(cfg.base_frames / max(cfg.speed, 1e-3)))
     f1 = f0 + total_frames - 1
     scn.frame_end = f1
 

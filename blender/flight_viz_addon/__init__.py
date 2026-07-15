@@ -71,12 +71,31 @@ class FlightVizProps(PropertyGroup):
         soft_max=20.0,
         description="Terrain/mountain height exaggeration",
     )
+    length_mode: EnumProperty(
+        name="Length",
+        description="How the animation length is decided",
+        items=[
+            ("SPEED", "Fixed ÷ speed", "Same clip length for every flight"),
+            ("DURATION", "Scale to duration", "Longer real flights => longer clips"),
+        ],
+        default="SPEED",
+    )
     speed: FloatProperty(
         name="Flight speed",
         default=1.0,
         min=0.1,
         soft_max=10.0,
         description="Animation speed (higher = faster = fewer frames)",
+    )
+    time_compression: FloatProperty(
+        name="Real sec / playback sec",
+        default=1800.0,
+        min=1.0,
+        soft_max=7200.0,
+        description=(
+            "DURATION mode: real flight seconds shown per playback second "
+            "(1800 = 30 min of flight per second)"
+        ),
     )
     chase_lens: FloatProperty(
         name="Chase cam lens (mm)",
@@ -146,6 +165,8 @@ def _config_from_props(props):
     Cfg.route_bevel_factor = props.route_thickness
     Cfg.terrain_exaggeration = props.terrain_exag
     Cfg.speed = props.speed
+    Cfg.frame_mode = props.length_mode
+    Cfg.time_compression = props.time_compression
     Cfg.chase_lens = props.chase_lens
     Cfg.lon_offset_deg = props.lon_offset
     Cfg.forward_sign = 1.0 if props.forward_axis == "+Y" else -1.0
@@ -290,7 +311,11 @@ class VIEW3D_PT_flightviz(Panel):
 
         col = layout.box().column(align=True)
         col.label(text="Animation")
-        col.prop(props, "speed")
+        col.prop(props, "length_mode")
+        if props.length_mode == "DURATION":
+            col.prop(props, "time_compression")
+        else:
+            col.prop(props, "speed")
         col.prop(props, "sync_sun")
         col.prop(props, "chase_cam")
         col.prop(props, "chase_lens")
