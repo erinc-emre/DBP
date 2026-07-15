@@ -59,10 +59,16 @@ class: text-white
 
 # Final Prototype
 
-Chase camera over night-lit Europe — live HUD, route trail, atmosphere glow.
+<div class="flex justify-center mt-2">
+  <video autoplay loop muted playsinline class="rounded shadow-lg h-100">
+    <source src="/flight_chase.mp4" type="video/mp4" />
+  </video>
+</div>
+
+<div class="text-center text-sm mt-2 opacity-80">Chase camera — live HUD, route trail, atmosphere glow, night lighting</div>
 
 <!--
-The money shot. DLH67K Frankfurt to Madrid at cruise. Point out: HUD (callsign/alt/speed/UTC/elapsed), the glowing route, the blue atmosphere limb, color grade + bloom.
+Play the rendered chase-cam clip (autoplay/loop). Point out the HUD (callsign/alt/speed/UTC/elapsed), the glowing route trail, the blue atmosphere limb, and color grade + bloom.
 -->
 
 ---
