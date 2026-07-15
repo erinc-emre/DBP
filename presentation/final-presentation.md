@@ -24,32 +24,31 @@ Final presentation. Fill in your name/date. The project: a real historical comme
 
 # The Idea
 
-Take a **real historical airline flight** and replay it as a cinematic
-fly-along on a photoreal 3D Earth.
+Take a **real airline flight** and replay it as a smooth fly-along on a 3D Earth.
 
 <div class="grid grid-cols-2 gap-8 mt-6">
 
 <div>
 
-**Two clean halves**
-- **Outside Blender** — a Python tool fetches the flight from the **OpenSky Network**, cleans it, and writes a small **`flight.json`**
-- **Inside Blender** — a **one-click add-on** consumes that JSON and builds the whole scene
+**Two parts**
+- **Outside Blender** — a Python tool downloads the flight from the **OpenSky Network**, cleans it, and writes a small **`flight.json`**
+- **Inside Blender** — a **one-click add-on** reads that file and builds the whole scene
 
 </div>
 
 <div>
 
-**Why split?**
-- Heavy deps (HTTP, OAuth2) stay out of Blender
-- The two sides meet at a **documented JSON contract** → they evolve independently
-- Once fetched, a flight is **offline & reproducible**
+**Why two parts?**
+- Network and login code stay out of Blender
+- The two parts meet at one simple file: **`flight.json`**
+- Once downloaded, a flight works **offline**, every time
 
 </div>
 
 </div>
 
 <!--
-Recap the concept and the architecture in one line: preprocessor + add-on, meeting at flight.json.
+Recap the concept: a preprocessor and an add-on, meeting at flight.json.
 -->
 
 ---
@@ -78,15 +77,14 @@ The money shot. DLH67K Frankfurt to Madrid at cruise. Point out: HUD (callsign/a
 
 <div class="text-sm mt-4 opacity-85">
 
-Procedural Earth (16K day / night / relief) · airports placed at both ends ·
-sun synced to the flight's **real UTC time** · constant-speed aircraft with
-pitch & bank · HUD · night fill light · atmosphere · color grade + bloom ·
-**Render Video** button → MP4
+Detailed Earth (day / night / mountains) · airports at both ends · the sun placed
+by the flight's **real time of day** · the plane pitches and banks · on-screen
+readout · night light · atmosphere and color polish · **one-click video export**
 
 </div>
 
 <!--
-Feature montage. Everything is a toggle in the sidebar. Sun position from real timestamps, not a spinning Earth.
+Feature montage. Everything is a toggle in the sidebar. The sun is placed by the real time of day, not a spinning Earth.
 -->
 
 ---
@@ -107,39 +105,39 @@ flowchart LR
 
 <div class="text-sm mt-6 opacity-85">
 
-The **`flight.json` contract** is the seam — a Markdown schema + a stdlib validator.
-Pass the validator → Blender is happy, and the two halves evolve independently.
-Fetch can even run **from the add-on UI** (it shells out to the preprocessor).
+Everything connects through one file: **`flight.json`**. A small checker makes
+sure the file is valid before Blender uses it. You can also **fetch a flight
+straight from the add-on** — it runs the Python tool for you.
 
 </div>
 
 <!--
-Same diagram as the README's Updated Workflow. Emphasize the flight.json contract as the decoupling seam, and that fetch can run from the UI.
+Same diagram as the README. Everything meets at flight.json, which is validated before use. Fetch can run from the UI.
 -->
 
 ---
 
 # Challenge: smooth flight from messy data
 
-Real ADS-B tracks are **ugly**: wildly uneven sampling, multi-minute coverage
-gaps, even frozen-then-jumping positions.
+The real flight data is **rough**: points arrive unevenly, with long gaps —
+sometimes the position freezes, then jumps.
 
 <div class="grid grid-cols-2 gap-6 mt-2 text-sm">
 
 <div>
 
-**Symptoms**
-- Aircraft **surged and stalled** (time-based playback)
-- A transatlantic gap of **2608 km** made the path dive **~160 km inside the Earth** (a straight chord through the sphere)
+**What went wrong**
+- The plane **sped up and stalled** as it played
+- One ocean gap of **2608 km** made the path cut a straight line **through the Earth** — the plane flew underground
 
 </div>
 
 <div>
 
-**Fixes**
-- Resample to a uniform grid, then **constant arc-length** → steady on-screen speed
-- Interpolate **along the sphere** (normalized lerp), radius-preserving smoothing
-- Altitude referenced to the **local ground** (terrain KD-tree)
+**How I fixed it**
+- Move the plane by **equal distance each frame** → steady speed
+- Follow the **curve of the Earth** between points, not a straight line
+- Measure altitude from the **ground right below** the plane
 
 </div>
 
@@ -147,44 +145,44 @@ gaps, even frozen-then-jumping positions.
 
 <div class="mt-3 text-sm">
 
-**Result** — peak step / mean **17.6× → ~1.0×**, jerk **63% → 21%**, and the flight is **always above the surface**.
+**Result** — the speed is even (jump-to-average ratio **17.6× → ~1.0×**) and the plane **always stays above the surface**.
 
 </div>
 
 <!--
-This is the most important implementation story. Naive time-parametrization fails on real data. The 2608km gap diving into the Earth is a great concrete example. Metrics show the improvement.
+Most important implementation story. Real data is rough; naive time playback fails. The 2608km gap flying underground is a concrete example. Plain-language fixes: equal distance per frame, follow the curve, altitude from the local ground.
 -->
 
 ---
 
-# Challenge: getting the data out of OpenSky
+# Challenge: getting the data from OpenSky
 
 <div class="grid grid-cols-2 gap-6 mt-2 text-sm">
 
 <div>
 
-**The API doesn't think in "flights"**
-- No "LH401" key — it's keyed on the **transponder `icao24`**
-- So: resolve **callsign → `icao24`** via the departures endpoint, *then* pull the track
-- Auth had to move to **OAuth2** (client credentials)
-- REST `/tracks` only serves the **last ~30 days**
+**The tricky parts**
+- You can't search by flight number like "LH401" — the data is keyed to the **aircraft's radio ID** (`icao24`)
+- So I look up the aircraft first, then get its track
+- Login uses a **token** (OAuth2)
+- Only the **last ~30 days** of flights are available
 
 </div>
 
 <div>
 
-**How we handled it**
-- Callsign + departure ICAO **or** a direct `icao24`
-- Fail **early & clearly** if the date is out of the 30-day window (before spending API credits)
-- Speed is **derived** from waypoints (tracks carry no velocity)
-- Vendored client kept **out of Blender**; the add-on auto-finds a Python with `requests`
+**How I handled it**
+- Enter a **callsign + departure airport**, or the aircraft ID directly
+- If the date is too old, stop early with a **clear message**
+- Speed isn't in the data, so I **compute it** from the points
+- The download code stays **outside Blender**; the add-on finds the right Python automatically
 
 </div>
 
 </div>
 
 <!--
-Second deep-dive: the data-access reality. icao24 keying is the surprising bit. OAuth2 + 30-day window. Practical guards.
+Second deep-dive: data access. Can't search by flight number - keyed to aircraft radio ID. Token login, 30-day window. Practical guards in plain terms.
 -->
 
 ---
@@ -195,33 +193,33 @@ Second deep-dive: the data-access reality. icao24 keying is the surprising bit. 
 
 <div>
 
-## Implemented ✅
-- OpenSky pipeline + JSON contract + validator
+## Done ✅
+- Download flights from OpenSky, save as `flight.json`
 - One-click add-on (+ **fetch from the UI**)
-- Constant-speed, surface-relative motion
-- Chase camera (level horizon, terrain-safe)
-- Pitch **&** bank into turns
+- Smooth, steady motion that stays above the ground
+- Chase camera (level, never underground)
+- Plane pitches and banks in turns
 - Airports at both ends
-- HUD (callsign / alt / speed / UTC / elapsed)
-- Night fill light · atmosphere · color grade + bloom
-- Render-to-MP4 · tests · packaging · docs
+- On-screen readout (callsign, altitude, speed, time)
+- Night light · atmosphere · nicer colors
+- Save to video · tests · easy install · docs
 
 </div>
 
 <div>
 
 ## Future work 🔭
-- **Weather layer** (ERA5 → texture overlay) — *descoped*
-- **Historic flights > 30 days** — needs OpenSky **Trino** research access
-- Richer cinematics (multi-cam, motion blur)
-- Higher-res / UDIM Earth for close-ups
+- **Weather layer** (clouds, wind) — left out for now
+- **Older flights (30+ days)** — needs special OpenSky access
+- More camera angles and motion blur
+- Sharper Earth textures for close-ups
 
 </div>
 
 </div>
 
 <!--
-Be honest: most of the plan is done; weather was deliberately descoped to keep a solid flight visualization; historic access is an external dependency.
+Most of the plan is done. Weather was left out on purpose to keep a solid flight visualization. Older-than-30-days needs external OpenSky access.
 -->
 
 ---
