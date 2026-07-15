@@ -254,8 +254,14 @@ built by a **one-click Blender add-on**.
 
 </div>
 
-<div class="mt-8 text-center opacity-70">Questions?</div>
+<div class="mt-8 text-center text-lg">
+
+**github.com/erinc-emre/DBP**
+
+</div>
+
+<div class="mt-4 text-center opacity-70">Questions?</div>
 
 <!--
-Wrap up. Offer a live demo (Fetch & Build), or play the rendered MP4.
+Wrap up. Repo: github.com/erinc-emre/DBP. Offer a live demo (Fetch & Build), or play the rendered MP4.
 -->
