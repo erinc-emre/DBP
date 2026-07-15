@@ -90,7 +90,7 @@ class FlightVizProps(PropertyGroup):
     )
     night_light_energy: FloatProperty(
         name="Night light power",
-        default=0.5,
+        default=0.35,
         min=0.0,
         soft_max=3.0,
         description="Strength of the chase-cam headlight sun (fill for the night side)",

@@ -83,16 +83,18 @@ class Config:
     airports_collection = "FlightAirports"
     make_subject_light = True  # a fill light on the chase cam so the plane/airport
     subject_light_object = "SubjectFill"  # stay visible on the night side
-    subject_light_energy = 0.5  # camera 'headlight' sun strength (W/m^2)
+    subject_light_energy = 0.35  # camera 'headlight' sun strength (W/m^2)
     make_atmosphere = True  # glowing atmosphere halo around the Earth limb
     atmosphere_object = "Atmosphere"
     atmosphere_height_frac = 0.02  # shell radius = R_base * (1 + this)
     atmosphere_color = (0.35, 0.55, 1.0)  # sky blue
-    atmosphere_strength = 2.0  # emission strength at the limb
-    atmosphere_blend = 0.25  # fresnel blend (higher = broader halo)
+    atmosphere_strength = 1.0  # emission strength at the limb
+    # thin fresnel band: the low chase cam flies INSIDE the shell, so keep the glow
+    # to the grazing limb only (higher would fog the whole sky blue)
+    atmosphere_blend = 0.04
     make_grade = True  # view-transform look + a compositor bloom (glare)
     grade_look = "AgX - Medium High Contrast"
-    bloom_threshold = 0.8  # brightness above which things bloom (city lights, limb)
+    bloom_threshold = 1.5  # only very bright pixels bloom (don't blow out the airport)
     overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
