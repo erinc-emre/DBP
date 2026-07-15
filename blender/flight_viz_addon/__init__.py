@@ -55,6 +55,24 @@ class FlightVizProps(PropertyGroup):
         default=True,
         description="On-screen readout: callsign, altitude, speed, UTC time, elapsed",
     )
+    airports: BoolProperty(
+        name="Place airports",
+        default=True,
+        description="Drop the airport model at the departure and arrival ends",
+    )
+    airport_path: StringProperty(
+        name="Airport model",
+        description="Path to the airport .glb ('//' = next to the .blend)",
+        subtype="FILE_PATH",
+        default="//airport.glb",
+    )
+    airport_size: FloatProperty(
+        name="Airport size",
+        default=0.05,
+        min=0.005,
+        soft_max=0.3,
+        description="Longest dimension of the placed airport, in scene units",
+    )
     # scale factors
     plane_scale: FloatProperty(
         name="Plane size (× real)", default=100.0, min=1.0, soft_max=500.0
@@ -157,6 +175,9 @@ def _config_from_props(props):
     Cfg.sync_sun = props.sync_sun
     Cfg.make_chase_cam = props.chase_cam
     Cfg.make_hud = props.hud
+    Cfg.place_airports = props.airports
+    Cfg.airport_model_path = props.airport_path
+    Cfg.airport_target_size = props.airport_size
     Cfg.aircraft_size_multiplier = props.plane_scale
     Cfg.altitude_exaggeration = props.altitude_exag
     Cfg.route_bevel_factor = props.route_thickness
@@ -302,6 +323,9 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "altitude_exag")
         col.prop(props, "route_thickness")
         col.prop(props, "terrain_exag")
+        col.prop(props, "airports")
+        col.prop(props, "airport_size")
+        col.prop(props, "airport_path")
 
         col = layout.box().column(align=True)
         col.label(text="Animation")

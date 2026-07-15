@@ -75,6 +75,10 @@ class Config:
     chase_lens = 20.0  # chase-cam focal length in mm (lower = wider = zoomed out)
     make_hud = True  # on-screen HUD (callsign, altitude, speed, UTC, elapsed)
     hud_object = "FlightHUD"
+    place_airports = True  # drop the airport model at the departure & arrival ends
+    airport_model_path = "//airport.glb"  # '//' = next to the .blend
+    airport_target_size = 0.05  # longest dimension of the placed airport, scene units
+    airports_collection = "FlightAirports"
     overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
@@ -570,6 +574,85 @@ def hud_frame_handler(scene, depsgraph=None):
     obj.data.body = frames.get(str(scene.frame_current), obj.data.body)
 
 
+def _clear_airports(cfg):
+    coll = bpy.data.collections.get(cfg.airports_collection)
+    if coll is None:
+        return
+    for o in list(coll.objects):
+        bpy.data.objects.remove(o, do_unlink=True)
+    bpy.data.collections.remove(coll)
+
+
+def place_airports(cfg, pts, center):
+    """Import the airport model and drop a copy at the departure and arrival ends,
+    each seated on the surface, up = Earth radial, runway aligned to the flight
+    direction (takeoff/landing heading)."""
+    import os
+
+    _clear_airports(cfg)
+    path = bpy.path.abspath(cfg.airport_model_path)
+    if not cfg.place_airports or not os.path.isfile(path):
+        return None
+    coll = bpy.data.collections.new(cfg.airports_collection)
+    bpy.context.scene.collection.children.link(coll)
+    ground_r = build_terrain_lookup(cfg, center)
+    _place_one(
+        cfg, coll, path, pts[0], pts[1] - pts[0], center, ground_r, "AirportDepart"
+    )
+    _place_one(
+        cfg, coll, path, pts[-1], pts[-1] - pts[-2], center, ground_r, "AirportArrive"
+    )
+    return coll
+
+
+def _place_one(cfg, coll, path, at_point, fwd_vec, center, ground_r, name):
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    imported = [o for o in bpy.data.objects if o not in before]
+    if not imported:
+        return None
+    # world bbox of the freshly-imported model (sits at the origin)
+    mn = mathutils.Vector((1e18, 1e18, 1e18))
+    mx = -mn
+    for o in imported:
+        if o.type != "MESH":
+            continue
+        for c in o.bound_box:
+            w = o.matrix_world @ mathutils.Vector(c)
+            for i in range(3):
+                mn[i] = min(mn[i], w[i])
+                mx[i] = max(mx[i], w[i])
+    dims = mx - mn
+    scale = cfg.airport_target_size / (max(dims.x, dims.y, dims.z) or 1.0)
+
+    root = bpy.data.objects.new(name, None)  # empty parent for the whole model
+    coll.objects.link(root)
+    root.rotation_mode = "XYZ"
+    for o in imported:
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        coll.objects.link(o)
+        if o.parent is None:
+            o.parent = root
+    root.scale = (scale, scale, scale)
+
+    # orientation: model +Z -> Earth radial (up), model +Y (runway) -> flight tangent
+    up_r = (at_point - center).normalized()
+    fwd = fwd_vec - fwd_vec.dot(up_r) * up_r
+    fwd = fwd.normalized() if fwd.length > 1e-6 else up_r.orthogonal().normalized()
+    right = fwd.cross(up_r).normalized()
+    root.rotation_euler = mathutils.Matrix(
+        (
+            (right.x, fwd.x, up_r.x),
+            (right.y, fwd.y, up_r.y),
+            (right.z, fwd.z, up_r.z),
+        )
+    ).to_euler()
+    # seat the model's base on the local ground surface
+    root.location = center + up_r * (ground_r(up_r) - mn.z * scale)
+    return root
+
+
 def _subsolar_dir(t_unix, off):
     """Unit vector (in the scene's geo convention) pointing at the subsolar point
     for a given UTC Unix time: the spot on Earth where the Sun is overhead.
@@ -594,6 +677,7 @@ def clear_scene(cfg=Config):
     """
     for name in ("FlightRoute", "ChaseCam", cfg.hud_object, cfg.overview_object):
         _remove(name)
+    _clear_airports(cfg)
     bpy.context.scene.pop("flightviz_hud", None)
     for obj_name in (cfg.aircraft_root, cfg.sun_object):
         o = bpy.data.objects.get(obj_name)
@@ -706,6 +790,7 @@ def import_flight(json_path, cfg=Config):
     trel = list(range(len(pts)))
 
     # (data["origin"]/["destination"] are metadata only — not drawn in the scene.)
+    place_airports(cfg, pts, center)  # airport model at the departure & arrival ends
     build_route(cfg, pts)
     animate_aircraft(cfg, pts, trel, f0, f1)
     if cfg.sync_sun:
