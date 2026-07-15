@@ -1,0 +1,16 @@
+# Python dependencies for the external preprocessor + tests.
+# The Blender add-on itself needs NOTHING here — it runs inside Blender and only
+# reads flight.json.
+
+# --- Preprocessor runtime (preprocess/opensky_to_flightjson.py) ---
+requests>=2.31          # HTTP + OAuth2 token calls (also used by the OpenSky client)
+
+# The official OpenSky Python client (OAuth2 branch) is NOT on PyPI in the form
+# we need, so it is vendored by cloning it next to this repo:
+#   git clone https://github.com/openskynetwork/opensky-api ../opensky-api
+# The preprocessor adds ../opensky-api/python to sys.path automatically.
+
+# --- Dev / testing ---
+pytest>=8.0
+
+# Note: validate_flight_json.py is stdlib-only (no dependencies).

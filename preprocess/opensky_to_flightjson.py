@@ -47,7 +47,11 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "opensky-api", "python")
 )
 
-import opensky_api  # noqa: E402  (path injected above)
+try:
+    import opensky_api  # noqa: E402  (path injected above)
+except ImportError:
+    # Only needed for live fetching; the pure helpers (and tests) work without it.
+    opensky_api = None
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -104,6 +108,20 @@ def utc_day_bounds(date_str):
     begin = int(day.timestamp())
     end = int((day + timedelta(days=1)).timestamp())
     return begin, end
+
+
+TRACKS_WINDOW_DAYS = 30  # OpenSky /tracks only serves roughly the last 30 days
+
+
+def within_tracks_window(day_end_ts, now_ts=None, window_days=TRACKS_WINDOW_DAYS):
+    """True if a flight day (its end timestamp) is recent enough for /tracks.
+
+    Pure/testable: `now_ts` defaults to the current UTC time.
+    """
+    if now_ts is None:
+        now_ts = datetime.now(timezone.utc).timestamp()
+    age_days = (now_ts - day_end_ts) / 86400.0
+    return age_days <= window_days
 
 
 def fmt_duration(seconds):
@@ -304,6 +322,11 @@ def compute_stats(waypoints):
 # ---------------------------------------------------------------------------
 def make_api(credentials):
     """Build an OpenSkyApi, authenticated if credentials are supplied."""
+    if opensky_api is None:
+        raise SystemExit(
+            "ERROR: opensky-api client not found. Clone it into ../opensky-api "
+            "(see preprocess/README.md)."
+        )
     if credentials:
         if not os.path.isfile(credentials):
             raise SystemExit(f"ERROR: credentials file not found: {credentials}")
@@ -320,6 +343,14 @@ def build_flight(args):
         raise SystemExit("ERROR: provide at least one of --callsign or --icao24.")
 
     begin, end = utc_day_bounds(args.date)
+    # Fail early (before spending API credits) if the date is outside the
+    # /tracks window instead of getting a confusing empty response later.
+    if not within_tracks_window(end):
+        raise SystemExit(
+            f"ERROR: {args.date} is older than ~{TRACKS_WINDOW_DAYS} days; the OpenSky "
+            "/tracks endpoint only serves roughly the last 30 days. Use a more recent "
+            "date, or apply for Trino historical access for older flights."
+        )
     api = make_api(args.credentials)
 
     try:
