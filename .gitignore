@@ -231,3 +231,9 @@ opencode.jsonc
 
 # Flight data fetched from the add-on's "Fetch from OpenSky" button
 /fetched_flight.json
+
+# Node / Slidev
+node_modules/
+package-lock.json
+presentation/.slidev/
+presentation/dist/
