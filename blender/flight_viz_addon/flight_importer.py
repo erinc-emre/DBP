@@ -203,7 +203,13 @@ def smooth_points(pts, window, passes):
             acc = mathutils.Vector((0.0, 0.0, 0.0))
             for j in range(i - k, i + k + 1):
                 acc += cur[j]
-            nxt[i] = acc / (2 * k + 1)
+            avg = acc / (2 * k + 1)
+            # Keep the smoothed point on its own shell: averaging Cartesian
+            # positions across a big coverage gap would otherwise sag the path
+            # deep INSIDE the Earth. Smooth the direction, preserve the radius.
+            r = cur[i].length
+            avg_len = avg.length
+            nxt[i] = avg * (r / avg_len) if avg_len > 1e-9 else cur[i]
         cur = nxt
     return cur
 
@@ -220,17 +226,18 @@ def _unit_dir(lat, lon, off):
     )
 
 
-def project_waypoint(wp, off, R_base, alt_frac_per_m, center):
-    """Place a waypoint at a radius defined RELATIVE to the Earth radius:
+def project_waypoint(wp, off, ground_r, alt_units_per_m, center):
+    """Place a waypoint at `altitude` above the LOCAL ground beneath it:
 
-        radius = R_base * (1 + alt_m/R_earth * exaggeration)
+        radius = ground_r(direction) + alt_m * alt_units_per_m
 
-    i.e. altitude is a fraction of the Earth's radius, not an absolute offset
-    stacked next to the model — so it's scale-independent and consistent with the
-    terrain/clouds by construction. `alt_frac_per_m = exaggeration / R_earth`.
+    `ground_r(dir)` is the displaced Earth's surface radius under that direction,
+    so the flight is always referenced to the closest earth surface (it never
+    dips into terrain, whatever the sea-level datum is). `alt_units_per_m` scales
+    real metres to scene units, i.e. `R_base * exaggeration / R_earth`.
     """
     d = _unit_dir(wp["lat"], wp["lon"], off)
-    radius = R_base * (1.0 + wp["alt_m"] * alt_frac_per_m)
+    radius = ground_r(d) + wp["alt_m"] * alt_units_per_m
     return center + radius * d
 
 
@@ -302,7 +309,15 @@ def position_at(pts, trel, tr):
             hi = mid
     span = trel[hi] - trel[lo]
     f = (tr - trel[lo]) / span if span > 0 else 0.0
-    return pts[lo].lerp(pts[hi], f)
+    a, b = pts[lo], pts[hi]
+    # Interpolate ALONG THE SPHERE (normalized lerp), not as a straight chord:
+    # big coverage gaps in the track would otherwise cut through the Earth.
+    ra, rb = a.length, b.length
+    if ra > 1e-9 and rb > 1e-9:
+        d = a.normalized().lerp(b.normalized(), f)
+        if d.length > 1e-9:
+            return d.normalized() * (ra + (rb - ra) * f)
+    return a.lerp(b, f)
 
 
 def resample_uniform(pts, trel, n, window, passes):
@@ -932,9 +947,14 @@ def import_flight(json_path, cfg=Config):
     # Altitude is radius-relative: a fraction of the Earth radius per real meter.
     # (altitude_exaggeration = 1.0 keeps it realistic; raise it only to exaggerate.)
     alt_frac_per_m = cfg.altitude_exaggeration / REAL_EARTH_R
+    alt_units_per_m = R_base * alt_frac_per_m  # real metres -> scene units
+
+    # Reference every waypoint to the LOCAL ground beneath it (closest earth
+    # surface), so the flight never dips into terrain regardless of the datum.
+    ground_r = build_terrain_lookup(cfg, center)
 
     off = cfg.lon_offset_deg
-    pts = [project_waypoint(w, off, R_base, alt_frac_per_m, center) for w in wps]
+    pts = [project_waypoint(w, off, ground_r, alt_units_per_m, center) for w in wps]
     trel = [w["t_rel"] for w in wps]
 
     # Smooth out raw ADS-B jitter so the route line and the aircraft motion
