@@ -93,12 +93,16 @@ Feature montage. Everything is a toggle in the sidebar. Sun position from real t
 
 # Architecture
 
-```mermaid {scale: 0.5}
+```mermaid {scale: 0.42}
 flowchart LR
-    A[Flight ID<br/>+ date] --> B[OpenSky<br/>Preprocessor]
-    B --> C[(flight.json<br/>+ validator)]
-    C --> D[Blender<br/>Add-on]
-    D --> E[Scene → MP4<br/>route · aircraft · HUD]
+    A[Callsign + Date] --> B[OpenSky Preprocessor]
+    B --> C[flight.json]
+    C --> D[Flight Visualizer add-on]
+    E[Boeing 747-8F] --> D
+    F[airport.glb] --> D
+    D --> G[Earth + route + aircraft + airports + HUD]
+    G --> H[Chase cam + sun + atmosphere + grade]
+    H --> I[Rendered MP4]
 ```
 
 <div class="text-sm mt-6 opacity-85">
@@ -110,7 +114,7 @@ Fetch can even run **from the add-on UI** (it shells out to the preprocessor).
 </div>
 
 <!--
-One diagram. Emphasize the JSON contract as the decoupling seam, and that fetch is now automatable from the UI. Preprocessor also ingests the aircraft + airport models on the Blender side.
+Same diagram as the README's Updated Workflow. Emphasize the flight.json contract as the decoupling seam, and that fetch can run from the UI.
 -->
 
 ---
