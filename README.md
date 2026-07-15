@@ -206,6 +206,19 @@ The core pipeline works end to end. An external Python tool pulls a real histori
 - Scene: procedural Earth with 8K day/night/normal/specular textures, real elevation, a cloud layer, the imported Boeing 747-8F animated along the route, and a chase camera.
 - Offline by design: once a flight is fetched, its `flight.json` is reused with no network or API keys.
 
+### Install & Run
+
+1. **Build the add-on zip:** `./blender/build_addon.sh` → writes `dist/flight_viz_addon.zip`
+   (or just zip the `blender/flight_viz_addon/` folder).
+2. **Install:** in Blender 4.2+ → *Edit ▸ Preferences ▸ Add-ons ▸ ⌄ ▸ Install from Disk…*,
+   pick the zip, then tick **Flight Visualizer**. (You can also drag the zip into the window.)
+3. **Open** `flight_visualization.blend` (it contains the Earth, aircraft, and sun the add-on expects).
+4. In the 3D viewport press **N** → **Flight** tab → set the *Flight JSON* path to
+   `preprocess/flight.json` → **Load & Build**. Use **Render Video** to export an MP4.
+
+The add-on needs three objects in the scene — `ProcEarth`, `B747_8F`, `Sun_T3` — which are
+already in the provided `.blend`.
+
 ### High-Level Workflow (Updated)
 
 ```mermaid
