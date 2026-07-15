@@ -187,12 +187,12 @@ Techniques: radius-preserving moving average · spherical (great-circle) interpo
 
 <div class="mt-2 text-sm">
 
-**Result** — no more surging, stalling, or flying underground. The biggest per-frame jump dropped from **~17× the normal step to about 1×** (even speed).
+**Result** — no more surging, stalling, or flying underground; the plane moves at a steady, even speed.
 
 </div>
 
 <!--
-Walk the 5-step pipeline in plain terms. The small techniques line names the actual methods: radius-preserving moving average (de-jitter), spherical/great-circle interpolation (follow the curve), uniform-time resampling (even timing), constant arc-length (equal distance per frame). The 17x->1x is the payoff.
+Walk the 5-step pipeline in plain terms. The small techniques line names the actual methods: radius-preserving moving average (de-jitter), spherical/great-circle interpolation (follow the curve), uniform-time resampling (even timing), constant arc-length (equal distance per frame).
 -->
 
 ---
