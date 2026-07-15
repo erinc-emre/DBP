@@ -117,6 +117,38 @@ Same diagram as the README. Everything meets at flight.json, which is validated 
 
 ---
 
+# Challenge: getting the data from OpenSky
+
+<div class="grid grid-cols-2 gap-6 mt-2 text-sm">
+
+<div>
+
+**The tricky parts**
+- You can't search by flight number like "LH401" — the data is keyed to the **aircraft's radio ID** (`icao24`)
+- So I look up the aircraft first, then get its track
+- Login uses a **token** (OAuth2)
+- Only the **last ~30 days** of flights are available
+
+</div>
+
+<div>
+
+**How I handled it**
+- Enter a **callsign + departure airport**, or the aircraft ID directly
+- If the date is too old, stop early with a **clear message**
+- Speed isn't in the data, so I **compute it** from the points
+- The download code stays **outside Blender**; the add-on finds the right Python automatically
+
+</div>
+
+</div>
+
+<!--
+Second deep-dive: data access. Can't search by flight number - keyed to aircraft radio ID. Token login, 30-day window. Practical guards in plain terms.
+-->
+
+---
+
 # Cleaning & smoothing the flight data
 
 The raw data is rough: points arrive unevenly, jitter around, and have long gaps.
@@ -192,38 +224,6 @@ the globe instead of drifting as it crosses the world.
 
 <!--
 Orientation is derived from the path, not the data. Nose to next point (heading + pitch in one), bank from how sharply the path turns (clamped 30 deg), up = Earth radial so it stays level on the sphere.
--->
-
----
-
-# Challenge: getting the data from OpenSky
-
-<div class="grid grid-cols-2 gap-6 mt-2 text-sm">
-
-<div>
-
-**The tricky parts**
-- You can't search by flight number like "LH401" — the data is keyed to the **aircraft's radio ID** (`icao24`)
-- So I look up the aircraft first, then get its track
-- Login uses a **token** (OAuth2)
-- Only the **last ~30 days** of flights are available
-
-</div>
-
-<div>
-
-**How I handled it**
-- Enter a **callsign + departure airport**, or the aircraft ID directly
-- If the date is too old, stop early with a **clear message**
-- Speed isn't in the data, so I **compute it** from the points
-- The download code stays **outside Blender**; the add-on finds the right Python automatically
-
-</div>
-
-</div>
-
-<!--
-Second deep-dive: data access. Can't search by flight number - keyed to aircraft radio ID. Token login, 30-day window. Practical guards in plain terms.
 -->
 
 ---
