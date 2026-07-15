@@ -14,18 +14,10 @@ External OpenSky preprocessor → `flight.json` → one-click Blender add-on
 
 </div>
 
-<div class="mt-12 text-base">
-
-**Erinc Celikten** · 15.07.2026
-
-</div>
-
-<div class="abs-br m-6 opacity-60 text-sm">
-Practical Course: Developing Blender Plugins for Digital Art and Content Creation
-</div>
+<div class="abs-br m-6 opacity-60 text-sm">DBP Course · Final Presentation</div>
 
 <!--
-Erinc Celikten. Final presentation for the Practical Course: Developing Blender Plugins for Digital Art and Content Creation. 15.07.2026.
+Final presentation. Fill in your name/date. The project: a real historical commercial flight, visualized end to end.
 -->
 
 ---
@@ -101,26 +93,24 @@ Feature montage. Everything is a toggle in the sidebar. Sun position from real t
 
 # Architecture
 
-```mermaid {scale: 0.75}
+```mermaid {scale: 0.5}
 flowchart LR
-    A[Callsign / icao24 + date] --> B[OpenSky Preprocessor<br/>fetch · clean · resample]
-    B --> C[(flight.json<br/>schema + validator)]
-    C --> D[Blender Add-on]
-    E[Aircraft + airport models] --> D
-    D --> F[Earth · route · aircraft<br/>airports · HUD · cameras]
-    F --> G[Rendered MP4]
+    A[Flight ID<br/>+ date] --> B[OpenSky<br/>Preprocessor]
+    B --> C[(flight.json<br/>+ validator)]
+    C --> D[Blender<br/>Add-on]
+    D --> E[Scene → MP4<br/>route · aircraft · HUD]
 ```
 
-<div class="text-sm mt-4 opacity-85">
+<div class="text-sm mt-6 opacity-85">
 
-The **`flight.json` contract** is the seam: a Markdown schema + a stdlib validator.
-Pass the validator → Blender is happy. Fetch can even run **from the add-on UI**
-(it shells out to the preprocessor).
+The **`flight.json` contract** is the seam — a Markdown schema + a stdlib validator.
+Pass the validator → Blender is happy, and the two halves evolve independently.
+Fetch can even run **from the add-on UI** (it shells out to the preprocessor).
 
 </div>
 
 <!--
-One diagram. Emphasize the JSON contract as the decoupling seam, and that fetch is now automatable from the UI.
+One diagram. Emphasize the JSON contract as the decoupling seam, and that fetch is now automatable from the UI. Preprocessor also ingests the aircraft + airport models on the Blender side.
 -->
 
 ---
