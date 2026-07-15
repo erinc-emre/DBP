@@ -45,7 +45,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | Aircraft forward-axis assumption | ✅ | "Model nose axis" **UI enum** (+Y / -Y) → `forward_sign`; no code edit for other models |
 | Banking / pitch on turns | ❌ | Only yaw+radial up; no roll into turns, no climb/descent pitch from vertrate |
 | Motion smoothing | ✅ (accepted) | Moving-average smoothing removes ADS-B jitter; linear interp between waypoints is intentional (constant-velocity segments, real speed preserved) |
-| Labels / HUD (alt, speed, time, ETA) | ❌ | None |
+| Labels / HUD (alt, speed, time, ETA) | ✅ | `FlightHUD` Font object parented to the chase cam (top-left overlay); a `frame_change_post` handler swaps per-frame text (callsign, altitude, speed km/h, UTC, elapsed/total) from values stored on the scene — works during renders too |
 | Multiple cameras / cinematic shots | ✅ (by choice) | Deliberately **chase-cam only** — overview camera + orbit removed to keep it simple |
 | Atmosphere glow | ❌ | Not added |
 | Lighting/color polish | ❌ | Default EEVEE look; no grading |

@@ -50,6 +50,11 @@ class FlightVizProps(PropertyGroup):
     )
     sync_sun: BoolProperty(name="Sync sun to flight time", default=True)
     chase_cam: BoolProperty(name="Build chase camera", default=True)
+    hud: BoolProperty(
+        name="HUD overlay",
+        default=True,
+        description="On-screen readout: callsign, altitude, speed, UTC time, elapsed",
+    )
     # scale factors
     plane_scale: FloatProperty(
         name="Plane size (× real)", default=100.0, min=1.0, soft_max=500.0
@@ -151,6 +156,7 @@ def _config_from_props(props):
 
     Cfg.sync_sun = props.sync_sun
     Cfg.make_chase_cam = props.chase_cam
+    Cfg.make_hud = props.hud
     Cfg.aircraft_size_multiplier = props.plane_scale
     Cfg.altitude_exaggeration = props.altitude_exag
     Cfg.route_bevel_factor = props.route_thickness
@@ -307,6 +313,7 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "sync_sun")
         col.prop(props, "chase_cam")
         col.prop(props, "chase_lens")
+        col.prop(props, "hud")
 
         col = layout.box().column(align=True)
         col.label(text="Calibration")
@@ -339,9 +346,16 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.flightviz = PointerProperty(type=FlightVizProps)
+    # keep the HUD text in sync with the current frame (incl. during renders)
+    h = flight_importer.hud_frame_handler
+    if h not in bpy.app.handlers.frame_change_post:
+        bpy.app.handlers.frame_change_post.append(h)
 
 
 def unregister():
+    h = flight_importer.hud_frame_handler
+    if h in bpy.app.handlers.frame_change_post:
+        bpy.app.handlers.frame_change_post.remove(h)
     del bpy.types.Scene.flightviz
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

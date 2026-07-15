@@ -25,10 +25,13 @@ Assumptions / conventions
 * Units in flight.json are SI (m, m/s, Unix s).
 """
 
-import bpy
+import datetime
 import json
 import math
+
+import bpy
 import mathutils
+from bpy.app.handlers import persistent  # noqa: F401  (used by @persistent below)
 
 REAL_EARTH_R = 6_371_000.0  # meters
 
@@ -70,6 +73,8 @@ class Config:
     chase_up_factor = 1.2
     chase_side_factor = 2.5
     chase_lens = 20.0  # chase-cam focal length in mm (lower = wider = zoomed out)
+    make_hud = True  # on-screen HUD (callsign, altitude, speed, UTC, elapsed)
+    hud_object = "FlightHUD"
     overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
@@ -234,6 +239,7 @@ def _remove(name):
         col = {
             "Mesh": bpy.data.meshes,
             "Curve": bpy.data.curves,
+            "TextCurve": bpy.data.curves,
             "Camera": bpy.data.cameras,
             "Light": bpy.data.lights,
         }.get(type(data).__name__)
@@ -424,6 +430,91 @@ def build_chase_cam(cfg, pts, trel, f0, f1, center):
     return chase
 
 
+def _sample_scalar(times, vals, tr):
+    """Linear interpolation of a scalar field sampled at `times` (like position_at)."""
+    if tr <= times[0]:
+        return vals[0]
+    if tr >= times[-1]:
+        return vals[-1]
+    lo, hi = 0, len(times) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if times[mid] <= tr:
+            lo = mid
+        else:
+            hi = mid
+    span = times[hi] - times[lo]
+    f = (tr - times[lo]) / span if span > 0 else 0.0
+    return vals[lo] + (vals[hi] - vals[lo]) * f
+
+
+def _mmss(seconds):
+    s = max(0, int(round(seconds)))
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
+def build_hud(cfg, wps, trel, f0, f1, camera, callsign):
+    """Create a screen-space HUD (a Font object parented to the camera) and store
+    the per-frame text on the scene. A frame-change handler swaps the text as the
+    animation plays (works during animation renders too).
+    """
+    _remove(cfg.hud_object)
+    cur = bpy.data.curves.new(cfg.hud_object, type="FONT")
+    cur.size = 0.00085
+    cur.align_x = "LEFT"
+    cur.align_y = "TOP"
+    obj = bpy.data.objects.new(cfg.hud_object, cur)
+    bpy.context.scene.collection.objects.link(obj)
+    # Parent to the camera and sit just in front of it (beyond the near clip, but
+    # closer than the aircraft) so it reads as a fixed top-left on-screen overlay.
+    obj.parent = camera
+    obj.location = (-0.0110, 0.0064, -0.013)
+    obj.rotation_euler = (0.0, 0.0, 0.0)
+    obj.hide_render = False
+    mat = _emissive(
+        cfg.hud_object + "_mat", (1.0, 1.0, 1.0), 1.6
+    )  # unlit, always legible
+    cur.materials.append(mat)
+
+    alt = [w["alt_m"] for w in wps]
+    spd = [w.get("speed_mps", 0.0) or 0.0 for w in wps]
+    t0 = wps[0]["t"]
+    total = trel[-1]
+    nf = max(f1 - f0, 1)
+    frames = {}
+    for f in range(f0, f1 + 1):
+        tr = (f - f0) / nf * total
+        a = _sample_scalar(trel, alt, tr)
+        kmh = _sample_scalar(trel, spd, tr) * 3.6
+        utc = datetime.datetime.fromtimestamp(t0 + tr, tz=datetime.timezone.utc)
+        frames[str(f)] = (
+            f"{callsign}\n"
+            f"ALT {a:6.0f} m\n"
+            f"SPD {kmh:5.0f} km/h\n"
+            f"UTC {utc:%H:%M:%S}\n"
+            f"T+  {_mmss(tr)} / {_mmss(total)}"
+        )
+    bpy.context.scene["flightviz_hud"] = json.dumps(frames)
+    obj.data.body = frames.get(str(f0), "")
+    return obj
+
+
+@persistent
+def hud_frame_handler(scene, depsgraph=None):
+    """Swap the HUD text to match the current frame (registered as frame_change_post)."""
+    data = scene.get("flightviz_hud")
+    if not data:
+        return
+    obj = bpy.data.objects.get(Config.hud_object)
+    if obj is None or obj.type != "FONT":
+        return
+    try:
+        frames = json.loads(data)
+    except (TypeError, ValueError):
+        return
+    obj.data.body = frames.get(str(scene.frame_current), obj.data.body)
+
+
 def _subsolar_dir(t_unix, off):
     """Unit vector (in the scene's geo convention) pointing at the subsolar point
     for a given UTC Unix time: the spot on Earth where the Sun is overhead.
@@ -431,7 +522,6 @@ def _subsolar_dir(t_unix, off):
     lon_subsolar = (12 - UTC_hours) * 15  (ignores the equation of time, ~<=15 min)
     lat_subsolar = solar declination for the date.
     """
-    import datetime
 
     dt = datetime.datetime.fromtimestamp(t_unix, tz=datetime.timezone.utc)
     hours = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
@@ -447,8 +537,9 @@ def clear_scene(cfg=Config):
     Leaves the Earth and the aircraft object in place (only clears their
     animation), so a fresh Build can run cleanly.
     """
-    for name in ("FlightRoute", "ChaseCam", cfg.overview_object):
+    for name in ("FlightRoute", "ChaseCam", cfg.hud_object, cfg.overview_object):
         _remove(name)
+    bpy.context.scene.pop("flightviz_hud", None)
     for obj_name in (cfg.aircraft_root, cfg.sun_object):
         o = bpy.data.objects.get(obj_name)
         if o and o.animation_data:
@@ -547,9 +638,15 @@ def import_flight(json_path, cfg=Config):
     if cfg.sync_sun:
         animate_sun(cfg, wps, f0, f1)
     _remove(cfg.overview_object)  # drop the legacy overview camera; chase cam only
+    callsign = data.get("meta", {}).get("callsign") or "FLIGHT"
     if cfg.make_chase_cam:
         chase = build_chase_cam(cfg, pts, trel, f0, f1, center)
         scn.camera = chase  # make the chase cam the active/rendered camera
+        if cfg.make_hud:
+            build_hud(cfg, wps, trel, f0, f1, chase, callsign)
+    else:
+        _remove(cfg.hud_object)  # no camera -> no HUD
+        scn.pop("flightviz_hud", None)
 
     scn.frame_set(f0)
     max_alt = max(w["alt_m"] for w in wps)
