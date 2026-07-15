@@ -70,12 +70,7 @@ class Config:
     chase_up_factor = 1.2
     chase_side_factor = 2.5
     chase_lens = 20.0  # chase-cam focal length in mm (lower = wider = zoomed out)
-    frame_camera = True  # aim the overview camera at the route after building
-    camera_object = "Camera_T3"  # overview camera to frame
-    overview_distance = 2.2  # overview camera distance = Earth radius * this
-    orbit_overview = False  # animate the overview cam in a slow arc around the route
-    orbit_degrees = 45.0  # total orbit sweep over the clip (0 = static)
-    orbit_tilt_deg = 30.0  # viewpoint tilt off the route-centre axis
+    overview_object = "Camera_T3"  # legacy overview camera — removed on build
     frame_start = None  # None -> use scene.frame_start
     base_frames = 96  # animation length (frames) at speed 1.0
     speed = 1.0  # flight animation speed (higher = faster = fewer frames)
@@ -429,58 +424,6 @@ def build_chase_cam(cfg, pts, trel, f0, f1, center):
     return chase
 
 
-def frame_overview_camera(cfg, pts, f0=None, f1=None):
-    """Place the overview camera outside the globe, aimed at the route's centre.
-
-    Static by default; if `cfg.orbit_overview` is set (and a frame range is given)
-    it bakes a slow arc that sweeps `orbit_degrees` around the route-centre axis,
-    tilted `orbit_tilt_deg` off that axis for a 3/4 view.
-    """
-    cam = bpy.data.objects.get(cfg.camera_object)
-    if cam is None:  # create the overview camera if it doesn't exist
-        cdata = bpy.data.cameras.new(cfg.camera_object)
-        cam = bpy.data.objects.new(cfg.camera_object, cdata)
-        bpy.context.scene.collection.objects.link(cam)
-    earth = bpy.data.objects[cfg.earth_object]
-    center = earth.matrix_world.translation.copy()
-    radius = max(earth.dimensions) / 2.0
-    mid = sum((p.normalized() for p in pts), mathutils.Vector()).normalized()
-    dist = radius * cfg.overview_distance
-    if cam.animation_data:
-        cam.animation_data_clear()
-    cam.rotation_mode = "XYZ"
-
-    def aim_from(direction, frame=None):
-        cam.location = center + direction.normalized() * dist
-        cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
-        if frame is not None:
-            cam.keyframe_insert("location", frame=frame)
-            cam.keyframe_insert("rotation_euler", frame=frame)
-
-    if cfg.orbit_overview and f0 is not None and f1 is not None and f1 > f0:
-        # tilt the viewpoint off the route-centre axis, then sweep it around that axis
-        tmp = mathutils.Vector((0, 0, 1))
-        if abs(mid.dot(tmp)) > 0.99:
-            tmp = mathutils.Vector((1, 0, 0))
-        tilt_axis = mid.cross(tmp).normalized()
-        start = (
-            mathutils.Matrix.Rotation(math.radians(cfg.orbit_tilt_deg), 3, tilt_axis)
-            @ mid
-        ).normalized()
-        nf = f1 - f0
-        for f in range(f0, f1 + 1):
-            ang = (f - f0) / nf * math.radians(cfg.orbit_degrees)
-            d = mathutils.Matrix.Rotation(ang, 3, mid) @ start
-            aim_from(d, frame=f)
-        for fc in _action_fcurves(cam.animation_data.action):
-            for kp in fc.keyframe_points:
-                kp.interpolation = "LINEAR"
-    else:
-        aim_from(mid)
-    bpy.context.scene.camera = cam
-    return cam
-
-
 def _subsolar_dir(t_unix, off):
     """Unit vector (in the scene's geo convention) pointing at the subsolar point
     for a given UTC Unix time: the spot on Earth where the Sun is overhead.
@@ -504,7 +447,7 @@ def clear_scene(cfg=Config):
     Leaves the Earth and the aircraft object in place (only clears their
     animation), so a fresh Build can run cleanly.
     """
-    for name in ("FlightRoute", "ChaseCam"):
+    for name in ("FlightRoute", "ChaseCam", cfg.overview_object):
         _remove(name)
     for obj_name in (cfg.aircraft_root, cfg.sun_object):
         o = bpy.data.objects.get(obj_name)
@@ -603,10 +546,10 @@ def import_flight(json_path, cfg=Config):
     animate_aircraft(cfg, pts, trel, f0, f1)
     if cfg.sync_sun:
         animate_sun(cfg, wps, f0, f1)
+    _remove(cfg.overview_object)  # drop the legacy overview camera; chase cam only
     if cfg.make_chase_cam:
-        build_chase_cam(cfg, pts, trel, f0, f1, center)
-    if cfg.frame_camera:
-        frame_overview_camera(cfg, pts, f0, f1)
+        chase = build_chase_cam(cfg, pts, trel, f0, f1, center)
+        scn.camera = chase  # make the chase cam the active/rendered camera
 
     scn.frame_set(f0)
     max_alt = max(w["alt_m"] for w in wps)

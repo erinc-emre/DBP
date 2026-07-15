@@ -37,7 +37,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | Aircraft model imported + scaled | ✅ | Boeing 747-8F GLB, `Aircraft_B747` collection |
 | Route curve + markers | ✅ | Great-circle curve, origin/dest emissive markers |
 | Aircraft animation along path | ✅ | Path-tangent orientation, baked over frames |
-| Chase camera | ✅ | Baked follow cam (`ChaseCam`); `Camera_T3` = overview. **Looks at the plane** with the **horizon leveled to the Earth** (up = radial): width axis parallel to the surface (no banking), pitch follows the aircraft |
+| Chase camera (only camera) | ✅ | Baked follow cam (`ChaseCam`) is the **sole** camera. **Looks at the plane** with the **horizon leveled to the Earth** (up = radial): width axis parallel to the surface (no banking), pitch follows the aircraft |
 | Chase cam clips underground at start/end | ✅ | Terrain-aware clamp: `build_terrain_lookup` indexes the displaced Earth mesh in a KD-tree; each chase-cam keyframe is kept ≥ `up_off` above the ground directly beneath it (and never below the aircraft). Verified above-surface at start/mid/end for altitude exaggeration ×10 **and** ×1 (stress). |
 | **Longitude calibration robustness** | ✅ | Now a **UI setting** ("Longitude offset"); default -177.19 for this asset, adjustable for any other Earth texture without code edits |
 | **Altitude exaggeration** | ✅ | Radius-relative (`radius = R_base·(1 + alt_m/R_earth·k)`) + user-controllable; no scene-unit offset |
@@ -46,7 +46,7 @@ project. The focus is a solid flight visualization. (Left here for the record.)
 | Banking / pitch on turns | ❌ | Only yaw+radial up; no roll into turns, no climb/descent pitch from vertrate |
 | Motion smoothing | ✅ (accepted) | Moving-average smoothing removes ADS-B jitter; linear interp between waypoints is intentional (constant-velocity segments, real speed preserved) |
 | Labels / HUD (alt, speed, time, ETA) | ❌ | None |
-| Multiple cameras / cinematic shots | ✅ | Overview + chase + optional **cinematic orbit** of the overview camera |
+| Multiple cameras / cinematic shots | ✅ (by choice) | Deliberately **chase-cam only** — overview camera + orbit removed to keep it simple |
 | Atmosphere glow | ❌ | Not added |
 | Lighting/color polish | ❌ | Default EEVEE look; no grading |
 
