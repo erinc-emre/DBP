@@ -50,6 +50,11 @@ class FlightVizProps(PropertyGroup):
     )
     sync_sun: BoolProperty(name="Sync sun to flight time", default=True)
     chase_cam: BoolProperty(name="Build chase camera", default=True)
+    orbit_overview: BoolProperty(
+        name="Orbit overview camera",
+        default=False,
+        description="Animate the overview camera in a slow arc around the route",
+    )
     # scale factors
     plane_scale: FloatProperty(
         name="Plane size (× real)", default=100.0, min=1.0, soft_max=500.0
@@ -160,6 +165,7 @@ def _config_from_props(props):
 
     Cfg.sync_sun = props.sync_sun
     Cfg.make_chase_cam = props.chase_cam
+    Cfg.orbit_overview = props.orbit_overview
     Cfg.aircraft_size_multiplier = props.plane_scale
     Cfg.altitude_exaggeration = props.altitude_exag
     Cfg.route_bevel_factor = props.route_thickness
@@ -319,6 +325,7 @@ class VIEW3D_PT_flightviz(Panel):
         col.prop(props, "sync_sun")
         col.prop(props, "chase_cam")
         col.prop(props, "chase_lens")
+        col.prop(props, "orbit_overview")
 
         col = layout.box().column(align=True)
         col.label(text="Calibration")
