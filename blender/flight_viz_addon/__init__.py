@@ -253,6 +253,45 @@ def _config_from_props(props):
 # --------------------------------------------------------------------------- #
 # Operators
 # --------------------------------------------------------------------------- #
+def _find_python(preferred):
+    """Return a Python executable that has `requests` installed, or None.
+
+    Blender (launched from the GUI) has a minimal PATH (/usr/bin:/bin), so a bare
+    "python3" resolves to the system Python which usually lacks `requests`. Probe
+    the user's choice first, then common user installs (pyenv/Homebrew), verifying
+    each can actually `import requests`.
+    """
+    import shutil
+
+    home = os.path.expanduser("~")
+    candidates = [
+        preferred,
+        "python3",
+        "python",
+        os.path.join(home, ".pyenv", "shims", "python3"),
+        "/opt/homebrew/bin/python3",
+        "/usr/local/bin/python3",
+        "/usr/bin/python3",
+    ]
+    tried = set()
+    for c in candidates:
+        if not c:
+            continue
+        exe = shutil.which(c) or (c if os.path.isfile(c) else None)
+        if not exe or exe in tried:
+            continue
+        tried.add(exe)
+        try:
+            r = subprocess.run(
+                [exe, "-c", "import requests"], capture_output=True, timeout=20
+            )
+            if r.returncode == 0:
+                return exe
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return None
+
+
 class FLIGHTVIZ_OT_fetch(Operator):
     bl_idname = "flightviz.fetch"
     bl_label = "Fetch & Build"
@@ -290,12 +329,21 @@ class FLIGHTVIZ_OT_fetch(Operator):
             self.report({"ERROR"}, f"Preprocessor not found: {script}")
             return {"CANCELLED"}
 
+        python = _find_python(props.python_exe)
+        if python is None:
+            self.report(
+                {"ERROR"},
+                "No Python with 'requests' found. Set the Python field to a full "
+                'interpreter path (find it with: python3 -c "import sys;print(sys.executable)").',
+            )
+            return {"CANCELLED"}
+
         out = (
             bpy.path.abspath("//fetched_flight.json")
             if bpy.data.filepath
             else os.path.join(tempfile.gettempdir(), "fetched_flight.json")
         )
-        cmd = [props.python_exe, script, "--date", date, "--out", out]
+        cmd = [python, script, "--date", date, "--out", out]
         if icao24:
             cmd += ["--icao24", icao24]
         else:
