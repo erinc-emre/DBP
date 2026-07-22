@@ -3,7 +3,7 @@
 # with a background music track laid over the whole thing.
 #
 #   ./presentation/final/build-video.sh
-#   -> presentation/final/public/final-video.mp4  (1920x1080, 24 fps)
+#   -> presentation/final/public/CeliktenErincEmre_final-video.mp4  (1920x1080, 24 fps)
 #
 # Segments, in order:
 #   1. Title card            (Slidev, 4s)
@@ -67,11 +67,11 @@ if [ -n "$MUSIC" ] && [ -f "$MUSIC" ]; then
   ffmpeg -y -i "$tmp/video.mp4" -stream_loop -1 -i "$MUSIC" \
     -filter:a "afade=t=in:st=0:d=1,afade=t=out:st=${fade_st}:d=3" \
     -map 0:v -map 1:a -c:v copy -c:a aac -ar 48000 -ac 2 -shortest \
-    "$pub/final-video.mp4" >/dev/null 2>&1
+    "$pub/CeliktenErincEmre_final-video.mp4" >/dev/null 2>&1
 else
   echo "4/4  No music file -> silent video"
-  cp "$tmp/video.mp4" "$pub/final-video.mp4"
+  cp "$tmp/video.mp4" "$pub/CeliktenErincEmre_final-video.mp4"
 fi
 
-echo "Done -> $pub/final-video.mp4"
+echo "Done -> $pub/CeliktenErincEmre_final-video.mp4"
 rm -rf "$tmp"

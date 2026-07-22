@@ -223,13 +223,14 @@ already in the provided `.blend`.
 
 ```text
 blender/flight_viz_addon/   Blender add-on (UI + scene builder)
-preprocess/                OpenSky fetcher, schema, validator, tests, demo flight.json
-assets/models/             Extra 3D assets used by the add-on (airport.glb)
-textures/                  Earth textures, tracked with relative paths
-presentation/              Slidev final presentation and media
+preprocess/                 OpenSky fetcher, schema, validator, tests, demo flight.json
+assets/models/              3D assets: airport.glb, boeing-747-8f/ (aircraft source)
+textures/                   Earth textures, tracked with relative paths
+presentation/final/         Final deck (slides.md), video deck (video.md), PDFs, media
+presentation/mid-project/   Mid-project deck (deck.md), speaker notes, canvas, PDF
 flight_visualization.blend  Main Blender scene
-DESIGN.md                  Design decisions and implementation notes
-GAPS.md                    Project status tracker
+DESIGN.md                   Design decisions and implementation notes
+GAPS.md                     Project status tracker
 ```
 
 ### High-Level Workflow (Updated)
@@ -285,12 +286,14 @@ built and rendered entirely by a one-click Blender add-on.
 
 ### Demo
 
-- **Final video:** [`presentation/final/public/final-video.mp4`](presentation/final/public/final-video.mp4)
-  — Slidev title cards + a plugin-UI walkthrough segment + the sample render, stitched
-  together (1080p). Rebuild it any time with `./presentation/final/build-video.sh`.
+- **Final video:** [`presentation/final/public/CeliktenErincEmre_final-video.mp4`](presentation/final/public/CeliktenErincEmre_final-video.mp4)
+  — Slidev title cards + a plugin-UI walkthrough + the sample render, stitched
+  together (1080p, background music). Rebuild any time with `./presentation/final/build-video.sh`.
+- **Slides (PDF):** [`presentation/final/CeliktenErincEmre_final-presentation.pdf`](presentation/final/CeliktenErincEmre_final-presentation.pdf)
+  and the video deck [`CeliktenErincEmre_final-video.pdf`](presentation/final/CeliktenErincEmre_final-video.pdf).
 - **Sample rendered output:** [`presentation/final/public/plugin_sample.mp4`](presentation/final/public/plugin_sample.mp4)
   — DLH67K, Frankfurt → Madrid, chase camera with HUD, atmosphere, and color grade.
-- **UI walkthrough:** drop your screen recording at
+- **UI walkthrough:** drop a screen recording at
   `presentation/final/public/ui-walkthrough.mp4` and re-run the build script — it
   replaces the placeholder card automatically. Recording plan: `presentation/final/video-script.md`.
 
