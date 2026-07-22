@@ -283,6 +283,14 @@ The project is feature-complete. A real historical flight is turned into a polis
 animated fly-along on a textured 3D Earth — fetched by an external preprocessor,
 built and rendered entirely by a one-click Blender add-on.
 
+### Demo
+
+- **Walkthrough video** (plugin UI + workflow): `presentation/final/video-script.md`
+  is the recording plan; the finished screengrab shows Fetch → Build → Render.
+- **Sample rendered output:** [`presentation/final/public/plugin_sample.mp4`](presentation/final/public/plugin_sample.mp4)
+  — DLH67K, Frankfurt → Madrid, chase camera with HUD, atmosphere, and color grade
+  (also embedded in the final Slidev deck under `presentation/final/`).
+
 ### What it does now
 
 - **Real flight, end to end.** `preprocess/opensky_to_flightjson.py` resolves a
@@ -353,3 +361,16 @@ flowchart LR
 **Weather visualization was descoped** to keep the project focused on a solid, reliable
 flight visualization. The only remaining external dependency is OpenSky Trino access,
 needed only for flights older than ~30 days (the REST tracks window).
+
+### Reflection
+
+The most valuable lesson was that **real-world data, not rendering, is the hard part**.
+The visuals came together quickly; the time went into taming messy ADS-B tracks —
+uneven sampling, multi-minute gaps, and frozen-then-jumping positions — into motion
+that reads as a smooth flight. The clean split between an **external preprocessor** and
+a **Blender add-on**, meeting at a small validated `flight.json`, kept both sides simple
+and let them evolve independently. The guiding principle throughout was *solid, simple,
+readable* over flashy: every feature (motion, camera, HUD, airports, atmosphere) is a
+small, independently toggleable piece, which made the plugin easy to debug, extend, and
+demo. Given more time, a weather layer and true historical (>30-day) access are the
+natural next steps.

@@ -226,13 +226,14 @@ DEVLOG.md
 /blender_mcp/
 /opensky-api/
 session.md
+session*.md
 opencode.jsonc
 
 # Rendered output (videos/frames from the add-on's Render Video button)
 /renders/
 *.mp4
 # ...but keep presentation media (embedded in the slides)
-!presentation/public/*.mp4
+!presentation/**/public/*.mp4
 
 # Flight data fetched from the add-on's "Fetch from OpenSky" button
 /fetched_flight.json
