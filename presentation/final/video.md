@@ -17,6 +17,24 @@ layout: center
 class: text-center
 ---
 
+# How it works
+
+```mermaid {scale: 0.62}
+flowchart LR
+    A[Callsign / icao24<br/>+ date] --> B[OpenSky<br/>Preprocessor]
+    B --> C[(flight.json)]
+    C --> D[Blender<br/>Add-on]
+    D --> E[Earth · route · aircraft<br/>airports · HUD · camera]
+    E --> F[Rendered<br/>MP4]
+```
+
+<div class="mt-6 text-sm opacity-60">External fetch → one small file → one-click scene → video</div>
+
+---
+layout: center
+class: text-center
+---
+
 # Plugin UI Walkthrough
 
 <div class="mt-6 text-xl opacity-80">Fetch a flight → Load &amp; Build → Render</div>
