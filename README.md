@@ -285,11 +285,14 @@ built and rendered entirely by a one-click Blender add-on.
 
 ### Demo
 
-- **Walkthrough video** (plugin UI + workflow): `presentation/final/video-script.md`
-  is the recording plan; the finished screengrab shows Fetch → Build → Render.
+- **Final video:** [`presentation/final/public/final-video.mp4`](presentation/final/public/final-video.mp4)
+  — Slidev title cards + a plugin-UI walkthrough segment + the sample render, stitched
+  together (1080p). Rebuild it any time with `./presentation/final/build-video.sh`.
 - **Sample rendered output:** [`presentation/final/public/plugin_sample.mp4`](presentation/final/public/plugin_sample.mp4)
-  — DLH67K, Frankfurt → Madrid, chase camera with HUD, atmosphere, and color grade
-  (also embedded in the final Slidev deck under `presentation/final/`).
+  — DLH67K, Frankfurt → Madrid, chase camera with HUD, atmosphere, and color grade.
+- **UI walkthrough:** drop your screen recording at
+  `presentation/final/public/ui-walkthrough.mp4` and re-run the build script — it
+  replaces the placeholder card automatically. Recording plan: `presentation/final/video-script.md`.
 
 ### What it does now
 
